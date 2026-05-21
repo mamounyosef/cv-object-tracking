@@ -69,7 +69,7 @@ btnTemplate = uibutton(cp,'push', ...
     'Visible','off');
 
 btnROI = uibutton(cp,'push', ...
-    'Text',' Select ROI', ...
+    'Text','+ Add ROI', ...
     'Position',[PADDING_PANEL y round(152*sx) BTN_HEIGHT], ...
     'BackgroundColor',[0.78 0.52 0.18], ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',13, ...
@@ -80,6 +80,14 @@ btnStep = uibutton(cp,'push', ...
     'Position',[PADDING_PANEL+round(160*sx) y round(84*sx) BTN_HEIGHT], ...
     'BackgroundColor',[0.28 0.62 0.38], ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',13, ...
+    'Visible','off');
+y = y - round(42*sy);
+
+btnClearROI = uibutton(cp,'push', ...
+    'Text','✕ Clear ROIs', ...
+    'Position',[PADDING_PANEL y round(244*sx) BTN_HEIGHT], ...
+    'BackgroundColor',[0.55 0.30 0.30], ...
+    'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
     'Visible','off');
 y = y - round(42*sy);
 
@@ -256,7 +264,7 @@ h = struct( ...
     'slLP',slLP, 'lblLP',lblLP, ...
     'slHP',slHP, 'lblHP',lblHP, ...
     'btnLoad',btnLoad, 'btnTemplate',btnTemplate, ...
-    'btnROI',btnROI, 'btnStep',btnStep, ...
+    'btnROI',btnROI, 'btnClearROI',btnClearROI, 'btnStep',btnStep, ...
     'btnPlay',btnPlay, 'btnPause',btnPause, 'btnStop',btnStop, ...
     'chkForceGray',chkForceGray, ...
     'chkHistEq',chkHistEq, ...
@@ -290,13 +298,13 @@ tracking = struct( ...
     'currentFrameRaw',[], ...
     'currentFrameInput',[], ...
     'frameIndex',0, ...
-    'initialBBox',[], ...
-    'currentBBox',[], ...
-    'trackerState',[], ...
-    'initialized',false, ...
-    'lost',false, ...
+    'initialBBoxes',{{}}, ...   % cell array of [x y w h] (one per ROI)
+    'currentBBoxes',{{}}, ...   % cell array of [x y w h] (one per active tracker; [] if lost)
+    'trackerStates',{{}}, ...   % cell array of state structs (one per tracker)
+    'initialized',false, ...    % true iff at least one tracker initialized
+    'allLost',false, ...        % true iff every tracker has lost its target
     'isPlaying',false, ...
-    'timer',[], ...          % TODO: add playback/timer logic in tracking phase.
+    'timer',[], ...
     'lastVis',[]);
 fig.UserData = struct('h',h, 'origImg',[], 'procImg',[], 'templateImg',[], ...
     'tracking',tracking, 'sx',sx, 'sy',sy, 'spacing',spacing);
@@ -305,6 +313,7 @@ fig.UserData = struct('h',h, 'origImg',[], 'procImg',[], 'templateImg',[], ...
 btnLoad.ButtonPushedFcn     = @(~,~) cb_Load(fig);
 btnTemplate.ButtonPushedFcn = @(~,~) cb_LoadTemplate(fig);
 btnROI.ButtonPushedFcn      = @(~,~) cb_SelectTrackingROI(fig);
+btnClearROI.ButtonPushedFcn = @(~,~) cb_ClearROIs(fig);
 btnStep.ButtonPushedFcn     = @(~,~) cb_StepTracking(fig);
 btnPlay.ButtonPushedFcn     = @(~,~) cb_PlayTracking(fig);
 btnPause.ButtonPushedFcn    = @(~,~) cb_PauseTracking(fig);
@@ -388,11 +397,11 @@ function cb_LoadTrackingVideo(fig)
     d.tracking.currentFrameRaw = firstFrame;
     d.tracking.currentFrameInput = frameInput;
     d.tracking.frameIndex = 1;
-    d.tracking.initialBBox = [];
-    d.tracking.currentBBox = [];
-    d.tracking.trackerState = [];
+    d.tracking.initialBBoxes = {};
+    d.tracking.currentBBoxes = {};
+    d.tracking.trackerStates = {};
     d.tracking.initialized = false;
-    d.tracking.lost = false;
+    d.tracking.allLost = false;
     d.tracking.isPlaying = false;
     d.tracking.lastVis = [];
     fig.UserData = d;
@@ -420,12 +429,18 @@ function cb_SelectTrackingROI(fig)
         return;
     end
 
-    imshow(d.tracking.currentFrameInput, 'Parent', d.h.axOrig);
+    % Render the first frame with any already-initialized ROIs overlaid, so
+    % the user can see what is already being tracked while drawing the next box.
+    renderTrackingInitialization(fig);
 
     try
         roi = drawrectangle(d.h.axOrig);
-        wait(roi);
-        if ~isvalid(roi)
+        % drawrectangle returns once the user finishes the initial click-drag
+        % (no double-click commit needed). If the user just clicked without
+        % a real drag, treat it as cancelled.
+        if ~isvalid(roi) || isempty(roi.Position) || ...
+                roi.Position(3) < 1 || roi.Position(4) < 1
+            if isvalid(roi), delete(roi); end
             return;
         end
         bbox = clampTrackingBBox(roi.Position, size(d.tracking.currentFrameInput));
@@ -442,7 +457,34 @@ function cb_SelectTrackingROI(fig)
         return;
     end
 
+    % Conflict check: reject if the new ROI overlaps an existing one too much.
+    for i = 1:numel(d.tracking.initialBBoxes)
+        if bboxIoU(bbox, d.tracking.initialBBoxes{i}) > 0.5
+            uialert(fig, sprintf(['The new ROI overlaps tracker %d by more ' ...
+                'than 50%%. Pick a non-overlapping region.'], i), ...
+                'ROI Conflict');
+            return;
+        end
+    end
+
     trackingInitFromROI(fig, bbox);
+end
+
+function cb_ClearROIs(fig)
+    d = fig.UserData;
+    if ~strcmp(d.h.ddCat.Value,'Object Tracking')
+        return;
+    end
+    stopTrackingTimer(fig);
+    d.tracking.initialBBoxes = {};
+    d.tracking.currentBBoxes = {};
+    d.tracking.trackerStates = {};
+    d.tracking.initialized = false;
+    d.tracking.allLost = false;
+    d.tracking.isPlaying = false;
+    d.tracking.lastVis = [];
+    fig.UserData = d;
+    resetTrackingToFirstFrame(fig);
 end
 
 function trackingInitFromROI(fig, bbox)
@@ -459,20 +501,16 @@ function trackingInitFromROI(fig, bbox)
                 'The ROI has too few KLT points. Select a more textured region.');
         end
     catch err
-        d.tracking.trackerState = [];
-        d.tracking.initialized = false;
-        d.tracking.lost = false;
-        fig.UserData = d;
         uialert(fig, sprintf('Could not initialize the KLT tracker.\n\n%s', err.message), ...
             'KLT Initialization Failed');
         return;
     end
 
-    d.tracking.initialBBox = bbox;
-    d.tracking.currentBBox = bbox;
-    d.tracking.trackerState = state;
+    d.tracking.initialBBoxes{end+1} = bbox;
+    d.tracking.currentBBoxes{end+1} = bbox;
+    d.tracking.trackerStates{end+1} = state;
     d.tracking.initialized = true;
-    d.tracking.lost = false;
+    d.tracking.allLost = false;
     fig.UserData = d;
 
     renderTrackingInitialization(fig);
@@ -488,7 +526,7 @@ function cb_StepTracking(fig)
             'Tracking Step');
         return;
     end
-    if ~d.tracking.initialized || isempty(d.tracking.trackerState)
+    if ~d.tracking.initialized || isempty(d.tracking.trackerStates)
         uialert(fig, 'Select a valid ROI before stepping KLT tracking.', ...
             'Tracking Step');
         return;
@@ -507,13 +545,13 @@ function cb_PlayTracking(fig)
             'Tracking Playback');
         return;
     end
-    if ~d.tracking.initialized || isempty(d.tracking.trackerState)
+    if ~d.tracking.initialized || isempty(d.tracking.trackerStates)
         uialert(fig, 'Select a valid ROI before playing KLT tracking.', ...
             'Tracking Playback');
         return;
     end
-    if d.tracking.lost
-        uialert(fig, 'Tracking is lost. Stop and select a new ROI before playback.', ...
+    if d.tracking.allLost
+        uialert(fig, 'All tracks are lost. Stop and select new ROIs before playback.', ...
             'Tracking Playback');
         return;
     end
@@ -585,33 +623,32 @@ function trackingStep(fig)
 
     frameInput = preProcess(frameRaw, d.h);
     params = getTrackingParams(fig);
-    try
-        ensureKLTTrackerOnPath();
-        [state, bboxOut, vis] = trackerKLT('update', frameInput, ...
-            d.tracking.trackerState, params);
-    catch err
-        stopTrackingTimer(fig);
-        uialert(fig, sprintf('Could not update the KLT tracker.\n\n%s', err.message), ...
-            'Tracking Step Failed');
-        return;
+
+    nTrackers = numel(d.tracking.trackerStates);
+    ensureKLTTrackerOnPath();
+    for i = 1:nTrackers
+        try
+            [state_i, bbox_i, ~] = trackerKLT('update', frameInput, ...
+                d.tracking.trackerStates{i}, params);
+        catch
+            % Isolate per-tracker failure: mark this one lost and keep going
+            % so other tracks are not killed by one tracker's exception.
+            state_i = d.tracking.trackerStates{i};
+            if isstruct(state_i), state_i.lost = true; end
+            bbox_i  = [];
+        end
+        d.tracking.trackerStates{i} = state_i;
+        d.tracking.currentBBoxes{i} = bbox_i;   % [] if lost
     end
 
     d.tracking.frameIndex = d.tracking.frameIndex + 1;
     d.tracking.currentFrameRaw = frameRaw;
     d.tracking.currentFrameInput = frameInput;
-    d.tracking.trackerState = state;
-    d.tracking.lastVis = vis;
-    if isempty(bboxOut)
-        d.tracking.lost = true;
-        d.tracking.currentBBox = [];
-    else
-        d.tracking.lost = false;
-        d.tracking.currentBBox = bboxOut;
-    end
+    d.tracking.allLost = all(cellfun(@isempty, d.tracking.currentBBoxes));
     fig.UserData = d;
 
-    renderTrackingFrame(fig, frameInput, d.tracking.currentBBox, vis);
-    if d.tracking.lost
+    renderTrackingFrame(fig, frameInput);
+    if d.tracking.allLost
         stopTrackingTimer(fig);
     end
 end
@@ -692,11 +729,11 @@ function resetTrackingToFirstFrame(fig)
     d.tracking.currentFrameRaw = firstFrame;
     d.tracking.currentFrameInput = preProcess(firstFrame, d.h);
     d.tracking.frameIndex = 1;
-    d.tracking.initialBBox = [];
-    d.tracking.currentBBox = [];
-    d.tracking.trackerState = [];
+    d.tracking.initialBBoxes = {};
+    d.tracking.currentBBoxes = {};
+    d.tracking.trackerStates = {};
     d.tracking.initialized = false;
-    d.tracking.lost = false;
+    d.tracking.allLost = false;
     d.tracking.isPlaying = false;
     d.tracking.timer = [];
     d.tracking.lastVis = [];
@@ -721,42 +758,49 @@ end
 function renderTrackingInitialization(fig)
     d = fig.UserData;
     frameInput = d.tracking.currentFrameInput;
-    if isempty(frameInput) || isempty(d.tracking.currentBBox), return; end
+    if isempty(frameInput), return; end
 
     d.h.lblAxOrig.Text = 'Tracking Input';
     d.h.lblAxFilt.Text = 'KLT Points';
-    d.h.lblAxProc.Text = 'Tracked Object';
+    d.h.lblAxProc.Text = 'Tracked Objects';
 
     imshow(frameInput, 'Parent', d.h.axOrig);
-    vis = drawInitialKLTVis(frameInput, d.tracking.trackerState, d.tracking.currentBBox);
+
+    vis = drawAllKLTVis(frameInput, d.tracking.trackerStates, d.tracking.currentBBoxes);
     if isempty(vis)
         imshow(frameInput, 'Parent', d.h.axFilt);
     else
         imshow(vis, 'Parent', d.h.axFilt);
         d.tracking.lastVis = vis;
     end
-    imshow(insertShape(toRGBFrame(frameInput), 'Rectangle', d.tracking.currentBBox, ...
-        'Color', [255 230 0], 'LineWidth', 2), 'Parent', d.h.axProc);
+
+    imshow(drawTrackingBBoxes(frameInput, d.tracking.currentBBoxes), ...
+        'Parent', d.h.axProc);
     fig.UserData = d;
 end
 
-function renderTrackingFrame(fig, frameInput, bbox, vis)
+function renderTrackingFrame(fig, frameInput)
     d = fig.UserData;
     d.h.lblAxOrig.Text = 'Tracking Input';
     d.h.lblAxFilt.Text = 'KLT Points';
-    d.h.lblAxProc.Text = 'Tracked Object';
+    d.h.lblAxProc.Text = 'Tracked Objects';
 
     imshow(frameInput, 'Parent', d.h.axOrig);
+
+    vis = drawAllKLTVis(frameInput, d.tracking.trackerStates, d.tracking.currentBBoxes);
     if isempty(vis)
         imshow(frameInput, 'Parent', d.h.axFilt);
     else
         imshow(vis, 'Parent', d.h.axFilt);
+        d.tracking.lastVis = vis;
     end
 
-    imshow(drawTrackingBBox(frameInput, bbox), 'Parent', d.h.axProc);
-    if d.tracking.lost
-        d.h.axProc.Title.String = 'Tracking Lost';
-        text(d.h.axProc, 0.5, 0.5, 'Tracking Lost', ...
+    imshow(drawTrackingBBoxes(frameInput, d.tracking.currentBBoxes), ...
+        'Parent', d.h.axProc);
+
+    if d.tracking.allLost
+        d.h.axProc.Title.String = 'All Tracks Lost';
+        text(d.h.axProc, 0.5, 0.5, 'All Tracks Lost', ...
             'Units','normalized', ...
             'Color',[1 0.45 0.25], ...
             'FontSize',14, ...
@@ -764,17 +808,31 @@ function renderTrackingFrame(fig, frameInput, bbox, vis)
             'HorizontalAlignment','center', ...
             'VerticalAlignment','middle');
     else
-        d.h.axProc.Title.String = 'Tracked Object';
+        nLost = sum(cellfun(@isempty, d.tracking.currentBBoxes));
+        if nLost > 0
+            d.h.axProc.Title.String = sprintf('Tracked Objects (%d lost)', nLost);
+        else
+            d.h.axProc.Title.String = 'Tracked Objects';
+        end
     end
+    fig.UserData = d;
 end
 
-function out = drawTrackingBBox(frame, bbox)
+function out = drawTrackingBBoxes(frame, bboxes)
     out = toRGBFrame(frame);
-    if isempty(bbox)
+    if isempty(bboxes)
         return;
     end
-    out = insertShape(out, 'Rectangle', bbox, ...
-        'Color', [255 230 0], 'LineWidth', 2);
+    for i = 1:numel(bboxes)
+        b = bboxes{i};
+        if isempty(b), continue; end
+        c = trackColor(i);
+        out = insertShape(out, 'Rectangle', b, 'Color', c, 'LineWidth', 2);
+        % ID label in the top-left corner of the box
+        out = insertText(out, [b(1), b(2)], sprintf(' %d ', i), ...
+            'FontSize', 14, 'BoxColor', c, 'BoxOpacity', 0.85, ...
+            'TextColor', [0 0 0]);
+    end
 end
 
 function clearTrackingPreviewAxis(ax, msg)
@@ -806,16 +864,59 @@ function tf = isValidTrackingBBox(bbox)
     tf = numel(bbox) == 4 && all(isfinite(bbox)) && bbox(3) >= 5 && bbox(4) >= 5;
 end
 
-function out = drawInitialKLTVis(frame, state, bbox)
-    out = [];
-    if isempty(state) || ~isfield(state,'points') || isempty(state.points)
+function out = drawAllKLTVis(frame, states, bboxes)
+% Overlay all tracker point clouds (per-track color) plus their bboxes.
+    if isempty(states)
+        out = [];
         return;
     end
 
-    out = insertMarker(toRGBFrame(frame), state.points, '+', ...
-        'Color', [0 230 0], 'Size', 5);
-    out = insertShape(out, 'Rectangle', bbox, ...
-        'Color', [255 230 0], 'LineWidth', 2);
+    out = toRGBFrame(frame);
+    anyDrawn = false;
+    for i = 1:numel(states)
+        s = states{i};
+        c = trackColor(i);
+        if ~isempty(s) && isfield(s,'points') && ~isempty(s.points)
+            out = insertMarker(out, s.points, '+', 'Color', c, 'Size', 5);
+            anyDrawn = true;
+        end
+        if i <= numel(bboxes) && ~isempty(bboxes{i})
+            out = insertShape(out, 'Rectangle', bboxes{i}, ...
+                'Color', c, 'LineWidth', 2);
+            anyDrawn = true;
+        end
+    end
+    if ~anyDrawn
+        out = [];
+    end
+end
+
+function iou = bboxIoU(a, b)
+% Intersection-over-union between two [x y w h] boxes.
+    if isempty(a) || isempty(b), iou = 0; return; end
+    ax2 = a(1) + a(3); ay2 = a(2) + a(4);
+    bx2 = b(1) + b(3); by2 = b(2) + b(4);
+    ix1 = max(a(1), b(1)); iy1 = max(a(2), b(2));
+    ix2 = min(ax2, bx2);   iy2 = min(ay2, by2);
+    iw = max(0, ix2 - ix1);
+    ih = max(0, iy2 - iy1);
+    inter = iw * ih;
+    uni = a(3) * a(4) + b(3) * b(4) - inter;
+    if uni <= 0, iou = 0; else, iou = inter / uni; end
+end
+
+function c = trackColor(id)
+% Stable palette so each tracker keeps its color across frames.
+    palette = uint8([ ...
+        255 230   0;   % yellow
+         30 200 255;   % cyan
+        255  90 130;   % pink
+         60 255  80;   % green
+        255 150  50;   % orange
+        180  90 255;   % purple
+        255 255 255;   % white
+        100 255 200]); % aqua
+    c = palette(mod(id-1, size(palette,1)) + 1, :);
 end
 
 function out = toRGBFrame(frame)
@@ -1064,6 +1165,7 @@ function configVisibility(fig)
     d.h.btnLoad.Text = ternary(strcmp(cat,'Object Tracking'),'  Load Video','  Load Image');
     d.h.btnTemplate.Visible = on_off(strcmp(cat,'Template Matching') || strcmp(cat,'Stereo Vision'));
     d.h.btnROI.Visible = on_off(strcmp(cat,'Object Tracking'));
+    d.h.btnClearROI.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnStep.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnPlay.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnPause.Visible = on_off(strcmp(cat,'Object Tracking'));
@@ -1265,6 +1367,29 @@ if strcmp(cat, 'Template Matching') && showFilt
         ax.Position = [xk, axTop_val, axW_4p, axH_val];
         lb.Position = [xk, labelY, axW_4p, round(22*sy)];
     end
+elseif strcmp(cat,'Object Tracking') && showFilt
+    % Object Tracking layout:
+    %   Left column  (1/3 width): axOrig stacked above axFilt
+    %   Right column (2/3 width): axProc, full height (big tracked-output view)
+    labelH   = round(22*sy);
+    labelGap = round(4*sy);
+    leftW    = floor((figW_live - x1_base - gap) / 3);
+    rightW   = figW_live - x1_base - gap - leftW;
+    halfH    = floor((axH_val - labelH - gap) / 2);
+
+    % axFilt at the bottom of the left column
+    d.h.axFilt.Position    = [x1_base, axTop_val, leftW, halfH];
+    d.h.lblAxFilt.Position = [x1_base, axTop_val + halfH + labelGap, leftW, labelH];
+
+    % axOrig stacked above axFilt
+    axOrig_y = axTop_val + halfH + labelH + gap;
+    d.h.axOrig.Position    = [x1_base, axOrig_y, leftW, halfH];
+    d.h.lblAxOrig.Position = [x1_base, axOrig_y + halfH + labelGap, leftW, labelH];
+
+    % axProc on the right, full height
+    right_x = x1_base + leftW + gap;
+    d.h.axProc.Position    = [right_x, axTop_val, rightW, axH_val];
+    d.h.lblAxProc.Position = [right_x, axTop_val + axH_val + labelGap, rightW, labelH];
 elseif showFilt
     % Three boxes — original layout
     d.h.axOrig.Position = [x1_base, axTop_val, axW_small, axH_val];

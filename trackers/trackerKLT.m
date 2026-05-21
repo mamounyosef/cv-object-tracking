@@ -51,6 +51,13 @@ function varargout = trackerKLT(mode, varargin)
             if numel(varargin) >= 3 && ~isempty(varargin{3}), params = varargin{3}; end
             P = applyDefaults(params);
 
+            % Once a tracker is marked lost, stay lost cheaply (don't poke
+            % vision.PointTracker, which may be in an undefined state).
+            if isfield(state,'lost') && state.lost
+                varargout = {state, [], []};
+                return;
+            end
+
             gray = toGray(frame);
 
             % --- Step 1: run LK on stored points ---------------------------
