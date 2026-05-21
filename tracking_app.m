@@ -1,6 +1,10 @@
 %% Close any previous instance
 old = findall(0,'Type','figure','Name','CV Image Processing App');
+<<<<<<< HEAD
 if ~isempty(old), close(old); end
+=======
+if ~isempty(old), delete(old); end
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
 
 %% ── Figure ───────────────────────────────────────────────────────────────
 ss = get(0,'ScreenSize');          % [1 1 screenW screenH]
@@ -55,7 +59,11 @@ cp = uipanel(fig,'Title','Controls', ...
 y = round(880 * sy);
 
 btnLoad = uibutton(cp,'push', ...
+<<<<<<< HEAD
     'Text','  Load Image', ...
+=======
+    'Text','📂  Load Image', ...
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
     'Position',[PADDING_PANEL y round(244*sx) BTN_HEIGHT], ...
     'BackgroundColor',[0.20 0.55 0.90], ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',13);
@@ -67,6 +75,7 @@ btnTemplate = uibutton(cp,'push', ...
     'BackgroundColor',[0.20 0.68 0.42], ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',13, ...
     'Visible','off');
+<<<<<<< HEAD
 
 btnROI = uibutton(cp,'push', ...
     'Text',' Select ROI', ...
@@ -103,6 +112,8 @@ btnStop = uibutton(cp,'push', ...
     'BackgroundColor',[0.66 0.32 0.30], ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
     'Visible','off');
+=======
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
 y = y - GAP_SECTION;
 
 makeLabel(cp,'Category',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT]);
@@ -110,7 +121,11 @@ y = y - GAP_LABEL_TO_CONTROL;
 ddCat = uidropdown(cp,'Items',{'Enhancement','Spatial Filtering', ...
         'Frequency Filtering','Color Space', ...
         'Pyramids','Template Matching','Filter Banks','Edge Detection','Corner Detection', ...
+<<<<<<< HEAD
         'Blob Detection','HoG','Hough Transform','RANSAC','Stereo Vision','Object Tracking'}, ...
+=======
+        'Blob Detection','HoG','Hough Transform','RANSAC','Stereo Vision'}, ...
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
         'Position',[PADDING_PANEL y round(244*sx) CONTROL_HEIGHT]);
 y = y - GAP_CONTROL_GROUP;
 
@@ -255,9 +270,13 @@ h = struct( ...
     'slParam',slParam, 'lblParam',lblParam, ...
     'slLP',slLP, 'lblLP',lblLP, ...
     'slHP',slHP, 'lblHP',lblHP, ...
+<<<<<<< HEAD
     'btnLoad',btnLoad, 'btnTemplate',btnTemplate, ...
     'btnROI',btnROI, 'btnStep',btnStep, ...
     'btnPlay',btnPlay, 'btnPause',btnPause, 'btnStop',btnStop, ...
+=======
+    'btnTemplate',btnTemplate, ...
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
     'chkForceGray',chkForceGray, ...
     'chkHistEq',chkHistEq, ...
     'chkBoxFilt',chkBoxFilt, 'lblBoxSize',lblBoxSize, 'slBoxSize',slBoxSize, ...
@@ -284,6 +303,7 @@ h.bwReservedY = round(2*(GAP_SECTION + GAP_LABEL_TO_CONTROL));
 
 % Store spacing constants for use in callbacks
 spacing = struct('GAP_AXES', GAP_AXES, 'PADDING_PANEL', PADDING_PANEL);
+<<<<<<< HEAD
 tracking = struct( ...
     'videoReader',[], ...
     'videoPath','', ...
@@ -300,15 +320,21 @@ tracking = struct( ...
     'lastVis',[]);
 fig.UserData = struct('h',h, 'origImg',[], 'procImg',[], 'templateImg',[], ...
     'tracking',tracking, 'sx',sx, 'sy',sy, 'spacing',spacing);
+=======
+fig.UserData = struct('h',h, 'origImg',[], 'procImg',[], 'templateImg',[], 'sx',sx, 'sy',sy, 'spacing',spacing);
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
 
 %% ── Wire up callbacks ────────────────────────────────────────────────────
 btnLoad.ButtonPushedFcn     = @(~,~) cb_Load(fig);
 btnTemplate.ButtonPushedFcn = @(~,~) cb_LoadTemplate(fig);
+<<<<<<< HEAD
 btnROI.ButtonPushedFcn      = @(~,~) cb_SelectTrackingROI(fig);
 btnStep.ButtonPushedFcn     = @(~,~) cb_StepTracking(fig);
 btnPlay.ButtonPushedFcn     = @(~,~) cb_PlayTracking(fig);
 btnPause.ButtonPushedFcn    = @(~,~) cb_PauseTracking(fig);
 btnStop.ButtonPushedFcn     = @(~,~) cb_StopTracking(fig);
+=======
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
 ddCat.ValueChangedFcn    = @(~,~) cb_CatChanged(fig);
 ddOp.ValueChangedFcn     = @(~,~) cb_OpChanged(fig);
 slParam.ValueChangingFcn = @(~,e) cb_ParamChanging(fig,e);
@@ -325,7 +351,10 @@ chkGauss.ValueChangedFcn       = @(~,~) cb_GaussToggle(fig);
 slGaussSigma.ValueChangedFcn   = @(~,~) cb_GaussSigmaReleased(fig);
 chkSobelH.ValueChangedFcn      = @(~,~) applyProc(fig);
 chkSobelV.ValueChangedFcn      = @(~,~) applyProc(fig);
+<<<<<<< HEAD
 fig.CloseRequestFcn = @(src,~) cb_CloseApp(src);
+=======
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
 
 %% ── Init and show ────────────────────────────────────────────────────────
 cb_CatChanged(fig);
@@ -336,6 +365,7 @@ fig.Visible = 'on';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function cb_Load(fig)
+<<<<<<< HEAD
     d = fig.UserData;
     if strcmp(d.h.ddCat.Value,'Object Tracking')
         cb_LoadTrackingVideo(fig);
@@ -344,11 +374,17 @@ function cb_Load(fig)
 
     [f,p] = uigetfile({'*.jpg;*.png;*.bmp;*.tif','Images'});
     if isequal(f,0), return; end
+=======
+    [f,p] = uigetfile({'*.jpg;*.png;*.bmp;*.tif','Images'});
+    if isequal(f,0), return; end
+    d = fig.UserData;
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
     d.origImg = imread(fullfile(p,f));
     fig.UserData = d;
     applyProc(fig);
 end
 
+<<<<<<< HEAD
 function cb_LoadTrackingVideo(fig)
     deleteTrackingTimer(fig);
     [f,p] = uigetfile({'*.mp4;*.avi;*.mov;*.m4v','Video Files (*.mp4, *.avi, *.mov, *.m4v)'});
@@ -400,6 +436,8 @@ function cb_LoadTrackingVideo(fig)
     renderTrackingPreview(fig);
 end
 
+=======
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
 function cb_LoadTemplate(fig)
     [f,p] = uigetfile({'*.jpg;*.png;*.bmp;*.tif','Images'});
     if isequal(f,0), return; end
@@ -409,6 +447,7 @@ function cb_LoadTemplate(fig)
     applyProc(fig);
 end
 
+<<<<<<< HEAD
 function cb_SelectTrackingROI(fig)
     d = fig.UserData;
     if ~strcmp(d.h.ddCat.Value,'Object Tracking')
@@ -849,6 +888,10 @@ function cb_CatChanged(fig)
         deleteTrackingTimer(fig);
         d = fig.UserData;
     end
+=======
+function cb_CatChanged(fig)
+    d = fig.UserData;
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
     switch d.h.ddCat.Value
         case 'Enhancement'
             d.h.ddOp.Items = {'Brightness','Histogram Equalization'};
@@ -881,8 +924,11 @@ function cb_CatChanged(fig)
             d.h.ddOp.Items = {'RANSAC Line','RANSAC Circle'};
         case 'Stereo Vision'
             d.h.ddOp.Items = {'Epipolar Lines','Disparity Map','Scanline Matching','Structure from Motion'};
+<<<<<<< HEAD
         case 'Object Tracking'
             d.h.ddOp.Items = {'Lucas-Kanade (KLT)'};
+=======
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
     end
     fig.UserData = d;
     configSlider(fig);
@@ -975,11 +1021,14 @@ function cb_GaussSigmaReleased(fig)
     applyProc(fig);
 end
 
+<<<<<<< HEAD
 function cb_CloseApp(fig)
     deleteTrackingTimer(fig);
     delete(fig);
 end
 
+=======
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %  SLIDER HELPERS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1059,6 +1108,7 @@ function configVisibility(fig)
     d.h.lblAxBBox.Visible = on_off(isTM);
     if ~isTM, cla(d.h.axBBox); end
     newCats = {'Pyramids','Template Matching','Filter Banks','Edge Detection','Corner Detection', ...
+<<<<<<< HEAD
                'Blob Detection','HoG','Hough Transform','RANSAC','Stereo Vision','Object Tracking'};
     d.h.kp.Visible = on_off(~ismember(cat, newCats));
     d.h.btnLoad.Text = ternary(strcmp(cat,'Object Tracking'),'  Load Video','  Load Image');
@@ -1069,6 +1119,12 @@ function configVisibility(fig)
     d.h.btnPause.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnStop.Visible = on_off(strcmp(cat,'Object Tracking'));
     noParamOps = {'Epipolar Lines','Structure from Motion','Lucas-Kanade (KLT)'};
+=======
+               'Blob Detection','HoG','Hough Transform','RANSAC','Stereo Vision'};
+    d.h.kp.Visible = on_off(~ismember(cat, newCats));
+    d.h.btnTemplate.Visible = on_off(strcmp(cat,'Template Matching') || strcmp(cat,'Stereo Vision'));
+    noParamOps = {'Epipolar Lines','Structure from Motion'};
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
     showParam = ~ismember(op,noP) && ~strcmp(cat,'Color Space') && ~ismember(op,noParamOps);
     d.h.slParam.Visible  = on_off(showParam);
     d.h.lblParam.Visible = on_off(showParam);
@@ -1210,6 +1266,7 @@ function applyProc(fig)
     op    = d.h.ddOp.Value;
     cat   = d.h.ddCat.Value;
 
+<<<<<<< HEAD
 if strcmp(cat,'Object Tracking')
     d.h.lblAxOrig.Text = 'Tracking Input';
     d.h.lblAxFilt.Text = 'KLT Points';
@@ -1220,6 +1277,8 @@ else
     if strcmp(d.h.lblAxProc.Text,'Tracked Object'), d.h.lblAxProc.Text = 'Processed Image'; end
 end
 
+=======
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
 % Operations that show 3 boxes: Original, Filter/Response, Processed
 % NOTE: Prewitt is excluded because it uses 2 kernels (Kh+Kv) and shows
 %       only the final magnitude result, so middle box would be redundant
@@ -1231,7 +1290,10 @@ threeAxes = {'Laplacian 1st','Laplacian 2nd','Boosting', ...
              'Gabor Bank', ...
              'Sobel (edge)','Prewitt (edge)','Roberts', ...
              'Epipolar Lines','Disparity Map','Structure from Motion', ...
+<<<<<<< HEAD
              'Lucas-Kanade (KLT)', ...
+=======
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
              };
 showFilt = ismember(op,threeAxes);
 d.h.axFilt.Visible    = ternary(showFilt,'on','off');
@@ -1298,11 +1360,14 @@ else
 end
 fig.UserData = d;
 
+<<<<<<< HEAD
     if strcmp(cat,'Object Tracking')
         % TODO: route loaded video frames through ROI init and playback/timer logic here.
         return;
     end
 
+=======
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
     % Layout is now done — bail out of image-processing if nothing loaded yet.
     % (Moved here from the top so the axes get properly sized on first paint,
     % otherwise the initial design positions overflowed the figure width.)
@@ -3172,4 +3237,8 @@ end
 
 function v = ternary(cond,a,b)
     if cond, v=a; else, v=b; end
+<<<<<<< HEAD
 end
+=======
+end
+>>>>>>> a1a987a31a9c9b98fdc513779b449f9eaa8985da
