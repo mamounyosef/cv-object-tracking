@@ -85,8 +85,15 @@ y = y - round(42*sy);
 
 btnClearROI = uibutton(cp,'push', ...
     'Text','✕ Clear ROIs', ...
-    'Position',[PADDING_PANEL y round(244*sx) BTN_HEIGHT], ...
+    'Position',[PADDING_PANEL y round(118*sx) BTN_HEIGHT], ...
     'BackgroundColor',[0.55 0.30 0.30], ...
+    'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
+    'Visible','off');
+
+btnAutoROI = uibutton(cp,'push', ...
+    'Text','🔍 Auto Detect', ...
+    'Position',[PADDING_PANEL+round(126*sx) y round(118*sx) BTN_HEIGHT], ...
+    'BackgroundColor',[0.22 0.48 0.78], ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
     'Visible','off');
 y = y - round(42*sy);
@@ -111,6 +118,13 @@ btnStop = uibutton(cp,'push', ...
     'BackgroundColor',[0.66 0.32 0.30], ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
     'Visible','off');
+y = y - round(36*sy);
+
+chkLockROI = uicheckbox(cp, ...
+    'Text','🔒 Lock ROI size (no auto-resize)', ...
+    'Position',[PADDING_PANEL y round(244*sx) round(22*sy)], ...
+    'FontColor',[0.9 0.9 0.9], 'FontSize',11, ...
+    'Value',true, 'Visible','off');
 y = y - GAP_SECTION;
 
 makeLabel(cp,'Category',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT]);
@@ -264,8 +278,10 @@ h = struct( ...
     'slLP',slLP, 'lblLP',lblLP, ...
     'slHP',slHP, 'lblHP',lblHP, ...
     'btnLoad',btnLoad, 'btnTemplate',btnTemplate, ...
-    'btnROI',btnROI, 'btnClearROI',btnClearROI, 'btnStep',btnStep, ...
+    'btnROI',btnROI, 'btnClearROI',btnClearROI, 'btnAutoROI',btnAutoROI, ...
+    'btnStep',btnStep, ...
     'btnPlay',btnPlay, 'btnPause',btnPause, 'btnStop',btnStop, ...
+    'chkLockROI',chkLockROI, ...
     'chkForceGray',chkForceGray, ...
     'chkHistEq',chkHistEq, ...
     'chkBoxFilt',chkBoxFilt, 'lblBoxSize',lblBoxSize, 'slBoxSize',slBoxSize, ...
@@ -305,7 +321,9 @@ tracking = struct( ...
     'allLost',false, ...        % true iff every tracker has lost its target
     'isPlaying',false, ...
     'timer',[], ...
-    'lastVis',[]);
+    'lastVis',[], ...
+    'autoParams',struct( ...    % last-used Auto-Detect parameters
+        'windowSec',0.5, 'T',25, 'X',40, 'minArea',200, 'minW',15, 'minH',15));
 fig.UserData = struct('h',h, 'origImg',[], 'procImg',[], 'templateImg',[], ...
     'tracking',tracking, 'sx',sx, 'sy',sy, 'spacing',spacing);
 
@@ -314,6 +332,7 @@ btnLoad.ButtonPushedFcn     = @(~,~) cb_Load(fig);
 btnTemplate.ButtonPushedFcn = @(~,~) cb_LoadTemplate(fig);
 btnROI.ButtonPushedFcn      = @(~,~) cb_SelectTrackingROI(fig);
 btnClearROI.ButtonPushedFcn = @(~,~) cb_ClearROIs(fig);
+btnAutoROI.ButtonPushedFcn  = @(~,~) cb_OpenAutoDetect(fig);
 btnStep.ButtonPushedFcn     = @(~,~) cb_StepTracking(fig);
 btnPlay.ButtonPushedFcn     = @(~,~) cb_PlayTracking(fig);
 btnPause.ButtonPushedFcn    = @(~,~) cb_PauseTracking(fig);
@@ -468,6 +487,255 @@ function cb_SelectTrackingROI(fig)
     end
 
     trackingInitFromROI(fig, bbox);
+end
+
+function cb_OpenAutoDetect(fig)
+% Opens a modal-style dialog where the user tunes the six auto-detect
+% parameters and either runs the detection or cancels.
+    d = fig.UserData;
+    if ~strcmp(d.h.ddCat.Value,'Object Tracking')
+        return;
+    end
+    if isempty(d.tracking.videoPath) || isempty(d.tracking.currentFrameInput)
+        uialert(fig, 'Load a video first before running auto-detection.', ...
+            'Auto Detect');
+        return;
+    end
+
+    P = d.tracking.autoParams;
+    dlg = uifigure('Name','Auto-Detect Settings', ...
+        'Position',[fig.Position(1)+100 fig.Position(2)+100 420 470], ...
+        'Color',[0.13 0.13 0.16], ...
+        'WindowStyle','modal');
+
+    snapSec = @(x) round(x*10)/10;   % seconds, 1 decimal place
+    snapInt = @(x) round(x);         % integer pixels / frames / gray-levels
+    rows = { ...
+        struct('field','windowSec','label','Window size',            'lo',0.1, 'hi',20,   'fmt','%.1f sec',      'snap',snapSec), ...
+        struct('field','T',        'label','Change threshold (T)',   'lo',5,   'hi',80,   'fmt','%d gray-levels','snap',snapInt), ...
+        struct('field','X',        'label','Max ROI size (X)',       'lo',10,  'hi',300,  'fmt','%d px',         'snap',snapInt), ...
+        struct('field','minArea',  'label','Min blob area',          'lo',50,  'hi',5000, 'fmt','%d px',         'snap',snapInt), ...
+        struct('field','minW',     'label','Min blob width',         'lo',5,   'hi',100,  'fmt','%d px',         'snap',snapInt), ...
+        struct('field','minH',     'label','Min blob height',        'lo',5,   'hi',100,  'fmt','%d px',         'snap',snapInt), ...
+        };
+
+    rowH = 56;
+    yTop = 470 - 30;
+    handles = struct();
+    for k = 1:numel(rows)
+        r = rows{k};
+        yr = yTop - k*rowH;
+        v0 = P.(r.field);
+        uilabel(dlg, 'Position',[20 yr+24 220 18], ...
+            'Text', r.label, 'FontColor',[0.9 0.9 0.9], 'FontSize',11);
+        valLbl = uilabel(dlg, 'Position',[250 yr+24 150 18], ...
+            'Text', sprintf(r.fmt, r.snap(v0)), 'FontColor',[0.7 0.85 1.0], ...
+            'FontSize',11, 'HorizontalAlignment','right');
+        sld = uislider(dlg, 'Position',[20 yr+18 380 3], ...
+            'Limits',[r.lo r.hi], 'Value',v0, ...
+            'MajorTicks',[], 'MinorTicks',[]);
+        snapFn = r.snap;
+        fmt    = r.fmt;
+        sld.ValueChangingFcn = @(s,e) set(valLbl,'Text', sprintf(fmt, snapFn(e.Value)));
+        sld.ValueChangedFcn  = @(s,e) set(valLbl,'Text', sprintf(fmt, snapFn(s.Value)));
+        handles.(r.field) = sld;
+    end
+
+    btnRun = uibutton(dlg,'push', ...
+        'Text','🔍 Run Detection', ...
+        'Position',[20 20 200 40], ...
+        'BackgroundColor',[0.22 0.55 0.32], ...
+        'FontColor',[1 1 1],'FontWeight','bold','FontSize',13);
+    btnCancel = uibutton(dlg,'push', ...
+        'Text','Cancel', ...
+        'Position',[240 20 160 40], ...
+        'BackgroundColor',[0.45 0.45 0.48], ...
+        'FontColor',[1 1 1],'FontWeight','bold','FontSize',13);
+    btnRun.ButtonPushedFcn    = @(~,~) runAutoDetect(fig, dlg, handles);
+    btnCancel.ButtonPushedFcn = @(~,~) delete(dlg);
+end
+
+function runAutoDetect(fig, dlg, handles)
+% Read slider values, persist them, run detection, create one tracker per
+% surviving blob, then close the dialog.
+    d = fig.UserData;
+    P = struct( ...
+        'windowSec', round(handles.windowSec.Value * 10) / 10, ...
+        'T',         round(handles.T.Value), ...
+        'X',         round(handles.X.Value), ...
+        'minArea',   round(handles.minArea.Value), ...
+        'minW',      round(handles.minW.Value), ...
+        'minH',      round(handles.minH.Value));
+    d.tracking.autoParams = P;
+    fig.UserData = d;
+
+    try
+        bboxes = autoDetectROIs(d.tracking.videoPath, P, d.h);
+    catch err
+        if isvalid(dlg), delete(dlg); end
+        uialert(fig, sprintf('Auto-detect failed.\n\n%s', err.message), ...
+            'Auto Detect Failed');
+        return;
+    end
+
+    if isempty(bboxes)
+        if isvalid(dlg), delete(dlg); end
+        uialert(fig, ['No moving objects detected. Try lowering the change ' ...
+            'threshold, increasing the window size, or reducing min area / ' ...
+            'min width / min height.'], 'Auto Detect');
+        return;
+    end
+
+    % Create one tracker per detected bbox. Skip any that overlap (IoU > 0.5)
+    % a bbox that is already being tracked (manual or previously auto-added).
+    nAdded = 0;
+    for i = 1:numel(bboxes)
+        bb = bboxes{i};
+        if ~isValidTrackingBBox(bb), continue; end
+        dd = fig.UserData;
+        skip = false;
+        for j = 1:numel(dd.tracking.initialBBoxes)
+            if bboxIoU(bb, dd.tracking.initialBBoxes{j}) > 0.5
+                skip = true; break;
+            end
+        end
+        if skip, continue; end
+        trackingInitFromROI(fig, bb);
+        nAdded = nAdded + 1;
+    end
+
+    if isvalid(dlg), delete(dlg); end
+
+    if nAdded == 0
+        uialert(fig, ['Detected blobs were rejected (KLT could not find ' ...
+            'enough corners or they overlapped existing trackers).'], ...
+            'Auto Detect');
+    end
+end
+
+function bboxes = autoDetectROIs(videoPath, P, h)
+% Frame-differencing auto-ROI detector with temporal memory and spatial crop.
+%
+% Algorithm:
+%   1. Read first N frames (N = windowSec * videoFPS).
+%   2. For each consecutive pair, compute |frame_{k+1} - frame_k|.
+%   3. For each pixel, remember the FIRST frame index in which its diff
+%      exceeded threshold T (0 = never moved).
+%   4. Connected-component the "ever moved" mask -> one big blob per object.
+%   5. For each blob:
+%        a) Find pixels stamped with the EARLIEST frame in this blob.
+%        b) Take the centroid of those pixels - this is where the object
+%           first appeared.
+%        c) Keep only blob pixels inside an X-by-X spatial window centered
+%           on that centroid (X is the user-set "Max ROI size" in pixels).
+%        d) Bounding box of the kept pixels = the ROI.
+%   6. Filter ROIs by minArea, minW, minH.
+
+    bboxes = {};
+    v = VideoReader(videoPath);
+    % Convert the user-facing "window size in seconds" to a concrete frame
+    % count using the video's own frame rate, then clamp to what the file
+    % actually has. We always scan at least 2 frames (else no diff is possible).
+    fps = v.FrameRate;
+    if ~(isnumeric(fps) && isfinite(fps) && fps > 0), fps = 30; end  % safe fallback
+    Nrequest = round(P.windowSec * fps);
+    N = min(max(2, Nrequest), max(2, floor(v.NumFrames)));
+    if N < 2, return; end
+
+    % Read N frames, apply the same preprocessing (gray, hist-eq, etc.) the
+    % rest of the app uses, so detection sees what tracking will see.
+    frames = cell(1, N);
+    for k = 1:N
+        if ~hasFrame(v), break; end
+        frames{k} = preProcess(readFrame(v), h);
+    end
+    frames = frames(~cellfun(@isempty, frames));
+    nF = numel(frames);
+    if nF < 2, return; end
+
+    % Per-pixel earliest-motion frame index (0 = never moved)
+    [H, W, ~] = size(frames{1});
+    firstMotion = zeros(H, W, 'uint16');
+
+    % Per-frame noise floor: small isolated diff specks are rejected BEFORE
+    % they get stamped into firstMotion. Without this, lowering T let
+    % compression artefacts on road markings / shadows / sensor noise fire
+    % at random frame 2, polluting the "earliest motion" centroid so the
+    % X-by-X window landed on a road edge instead of the car.
+    % The floor scales with minArea so it stays consistent across videos.
+    noiseFloorArea = max(15, floor(P.minArea / 6));
+
+    grayPrev = autoGray(frames{1});
+    for k = 2:nF
+        grayCurr = autoGray(frames{k});
+        diff = abs(double(grayCurr) - double(grayPrev));
+        moved = diff > P.T;
+        % Drop isolated noise specks BEFORE stamping firstMotion.
+        moved = bwareaopen(moved, noiseFloorArea);
+        newlyMoved = moved & (firstMotion == 0);
+        firstMotion(newlyMoved) = uint16(k);
+        grayPrev = grayCurr;
+    end
+
+    trailMask = firstMotion > 0;
+    if ~any(trailMask, 'all'), return; end
+
+    % Belt-and-braces: also clean the final trail mask (catches leftover
+    % thin connections that survived per-frame filtering).
+    trailMask = bwareaopen(trailMask, max(10, floor(P.minArea / 8)));
+
+    cc = bwconncomp(trailMask);
+    if cc.NumObjects == 0, return; end
+    stats = regionprops(cc, 'PixelIdxList', 'Area');
+
+    for i = 1:numel(stats)
+        if stats(i).Area < P.minArea, continue; end
+
+        blobIdx    = stats(i).PixelIdxList;
+        blobFrames = firstMotion(blobIdx);
+        valid      = blobFrames > 0;
+        if ~any(valid), continue; end
+
+        % Centroid of the EARLIEST-stamped pixels in this blob: this is the
+        % spatial origin of the object's motion.
+        earliest = min(blobFrames(valid));
+        seedIdx  = blobIdx(blobFrames == earliest);
+        [sy, sx] = ind2sub([H W], seedIdx);
+        cy = mean(sy);
+        cx = mean(sx);
+
+        % X-by-X spatial window centered on the seed centroid (clamped).
+        half = P.X / 2;
+        yLo = max(1, round(cy - half));
+        yHi = min(H, round(cy + half));
+        xLo = max(1, round(cx - half));
+        xHi = min(W, round(cx + half));
+
+        % Keep only blob pixels inside the window.
+        [allY, allX] = ind2sub([H W], blobIdx);
+        inWin = (allY >= yLo) & (allY <= yHi) & ...
+                (allX >= xLo) & (allX <= xHi);
+        if ~any(inWin), continue; end
+
+        keepY = allY(inWin);
+        keepX = allX(inWin);
+        y1 = min(keepY); y2 = max(keepY);
+        x1 = min(keepX); x2 = max(keepX);
+        bw = x2 - x1 + 1;
+        bh = y2 - y1 + 1;
+
+        if bw < P.minW || bh < P.minH, continue; end
+
+        bboxes{end+1} = double([x1 y1 bw bh]); %#ok<AGROW>
+    end
+end
+
+function g = autoGray(f)
+    if size(f,3) == 3
+        g = rgb2gray(f);
+    else
+        g = f;
+    end
 end
 
 function cb_ClearROIs(fig)
@@ -653,9 +921,16 @@ function trackingStep(fig)
     end
 end
 
-function params = getTrackingParams(~)
-    % TODO: expose KLT initialization/update parameters in the tracking UI.
+function params = getTrackingParams(fig)
+    % Build the params struct passed to trackerKLT('init'/'update').
+    % Read live GUI controls so toggling them affects the next frame.
     params = struct();
+    if isvalid(fig)
+        d = fig.UserData;
+        if isfield(d.h,'chkLockROI') && isvalid(d.h.chkLockROI)
+            params.lockSize = logical(d.h.chkLockROI.Value);
+        end
+    end
 end
 
 function trackingTimerTick(fig)
@@ -675,6 +950,10 @@ function period = trackingTimerPeriod(videoReader)
     if isprop(videoReader,'FrameRate') && isfinite(videoReader.FrameRate) && videoReader.FrameRate > 0
         period = max(0.02, min(0.20, 1/videoReader.FrameRate));
     end
+    % MATLAB's timer Period supports 1 ms precision only. Round to the
+    % nearest millisecond to silence the "sub-millisecond precision will
+    % be ignored" warning. Floor at 1 ms.
+    period = max(0.001, round(period * 1000) / 1000);
 end
 
 function stopTrackingTimer(fig)
@@ -1166,10 +1445,12 @@ function configVisibility(fig)
     d.h.btnTemplate.Visible = on_off(strcmp(cat,'Template Matching') || strcmp(cat,'Stereo Vision'));
     d.h.btnROI.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnClearROI.Visible = on_off(strcmp(cat,'Object Tracking'));
+    d.h.btnAutoROI.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnStep.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnPlay.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnPause.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnStop.Visible = on_off(strcmp(cat,'Object Tracking'));
+    d.h.chkLockROI.Visible = on_off(strcmp(cat,'Object Tracking'));
     noParamOps = {'Epipolar Lines','Structure from Motion','Lucas-Kanade (KLT)'};
     showParam = ~ismember(op,noP) && ~strcmp(cat,'Color Space') && ~ismember(op,noParamOps);
     d.h.slParam.Visible  = on_off(showParam);
@@ -1424,7 +1705,17 @@ end
 fig.UserData = d;
 
     if strcmp(cat,'Object Tracking')
-        % TODO: route loaded video frames through ROI init and playback/timer logic here.
+        % Refresh the cached first-frame view with current preprocessing
+        % settings (so toggling Grayscale / Gaussian / etc. after loading
+        % the video propagates to KLT init and auto-detect previews).
+        % Only safe before any tracker is initialized — once tracking has
+        % started, changing preprocessing would invalidate the tracker
+        % state, so we leave the cached frame alone.
+        if ~isempty(d.tracking.currentFrameRaw) && ~d.tracking.initialized
+            d.tracking.currentFrameInput = preProcess(d.tracking.currentFrameRaw, d.h);
+            fig.UserData = d;
+            renderTrackingPreview(fig);
+        end
         return;
     end
 
