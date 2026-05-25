@@ -121,7 +121,42 @@ btnStop = uibutton(cpInner,'push', ...
     'BackgroundColor',[0.66 0.32 0.30], ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
     'Visible','off');
-y = y - round(36*sy);
+y = y - round(40*sy);
+
+% --- Save Frame button (stays in Controls panel) -----------------------
+btnSave = uibutton(cpInner,'push', ...
+    'Text','💾 Save Frame', ...
+    'Position',[PADDING_PANEL y round(244*sx) BTN_HEIGHT], ...
+    'BackgroundColor',[0.15 0.35 0.55], ...
+    'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
+    'Visible','off');
+y = y - GAP_SECTION;
+
+% --- Playback bar (Frame counter + FPS + Video slider) -----------------
+% Parented to the FIGURE so it sits directly below the video axes,
+% spanning their width, instead of being squeezed into the Controls
+% panel. Sized larger for easy clicking/scrubbing.
+playbackY = round(280*sy);                 % just below the bottom of axes (axes bottom is at axTop_val=340*sy)
+playbackX = round(290*sx);
+playbackW = round(1258*sx);                % spans original kp panel width
+lblVideoFrame = uilabel(fig, ...
+    'Position',[playbackX, playbackY+round(28*sy), round(220*sx), round(20*sy)], ...
+    'Text','Time: 0.00 s / 0.00 s', ...
+    'FontSize',12,'FontColor',[0.9 0.9 0.9], ...
+    'HorizontalAlignment','left', ...
+    'Visible','off');
+lblFPS = uilabel(fig, ...
+    'Position',[playbackX+playbackW-round(180*sx), playbackY+round(28*sy), round(180*sx), round(20*sy)], ...
+    'Text','FPS: --', ...
+    'FontSize',12,'FontColor',[0.9 0.9 0.9], ...
+    'HorizontalAlignment','right', ...
+    'Visible','off');
+sliderVideo = uislider(fig, ...
+    'Limits',[0 1], 'Value',0, ...
+    'Position',[playbackX, playbackY, playbackW, round(3*sy)], ...
+    'FontSize',10,'FontColor',[0.85 0.85 0.85], ...
+    'MajorTicks',[],'MinorTicks',[], ...
+    'Visible','off');
 
 lblPyrLevels = uilabel(cpInner, ...
     'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
@@ -353,6 +388,7 @@ txtKern = uitextarea(kp,'Position',[round(450*sx) LABEL_HEIGHT round(790*sx) rou
     'FontColor',[0.85 1.0 0.85],'BackgroundColor',[0.08 0.10 0.08], ...
     'Editable','off');
 
+
 %% ── Store all handles + state in figure UserData ─────────────────────────
 h = struct( ...
     'fig',fig, 'ddCat',ddCat, 'ddOp',ddOp, ...
@@ -362,6 +398,8 @@ h = struct( ...
     'btnLoad',btnLoad, 'btnTemplate',btnTemplate, ...
     'btnStep',btnStep, ...
     'btnPlay',btnPlay, 'btnPause',btnPause, 'btnStop',btnStop, ...
+    'sliderVideo',sliderVideo, 'lblVideoFrame',lblVideoFrame, ...
+    'lblFPS',lblFPS, 'btnSave',btnSave, ...
     'lblPyrLevels',lblPyrLevels,         'slPyrLevels',slPyrLevels, ...
     'lblMotionThresh',lblMotionThresh,   'slMotionThresh',slMotionThresh, ...
     'lblMinClusterPts',lblMinClusterPts, 'slMinClusterPts',slMinClusterPts, ...
@@ -417,6 +455,16 @@ btnStep.ButtonPushedFcn     = @(~,~) cb_StepTracking(fig);
 btnPlay.ButtonPushedFcn     = @(~,~) cb_PlayTracking(fig);
 btnPause.ButtonPushedFcn    = @(~,~) cb_PauseTracking(fig);
 btnStop.ButtonPushedFcn     = @(~,~) cb_StopTracking(fig);
+btnSave.ButtonPushedFcn     = @(~,~) saveButton(fig);
+% Slider needs BOTH handlers so it doesn't fight the playback timer:
+%   ValueChangingFcn  - fires the moment the user grabs the slider; pauses
+%                       the timer so it stops overwriting sliderVideo.Value
+%                       every frame (which was causing the "glitchy /
+%                       unresponsive" feel).
+%   ValueChangedFcn   - fires once on release; seeks the video to the
+%                       chosen time and auto-resumes playback.
+sliderVideo.ValueChangingFcn = @(src,evt) cb_VideoSliderChanging(fig, evt.Value);
+sliderVideo.ValueChangedFcn  = @(src,evt) cb_VideoSeek(fig, evt.Value);
 ddCat.ValueChangedFcn    = @(~,~) cb_CatChanged(fig);
 ddOp.ValueChangedFcn     = @(~,~) cb_OpChanged(fig);
 slParam.ValueChangingFcn = @(~,e) cb_ParamChanging(fig,e);
@@ -449,6 +497,7 @@ btnReset.ButtonPushedFcn          = @(~,~) cb_ResetDefaults(fig);
 fig.CloseRequestFcn = @(src,~) cb_CloseApp(src);
 
 %% ── Init and show ────────────────────────────────────────────────────────
+ensureUiOnPath();   % adds ui/ to MATLAB path so saveButton, videoSlider, computeFPS are callable
 cb_CatChanged(fig);
 fig.Visible = 'on';
 
@@ -541,6 +590,11 @@ function cb_LoadTrackingVideo(fig)
     end
 
     renderTrackingPreview(fig);
+    ensureUiOnPath();
+    videoSlider(fig, 'update');
+    if isfield(d.h,'lblFPS') && isvalid(d.h.lblFPS)
+        d.h.lblFPS.Text = 'FPS: --';
+    end
 end
 
 function cb_LoadTemplate(fig)
@@ -630,6 +684,8 @@ function trackingStep(fig)
     videoReader = d.tracking.videoReader;
     if isempty(videoReader), return; end
 
+    tStep = tic;   % full per-frame processing time (read + preprocess + LK + render)
+
     try
         if ~hasFrame(videoReader)
             d.h.axProc.Title.String = 'End of Video';
@@ -676,6 +732,16 @@ function trackingStep(fig)
     fig.UserData = d;
 
     renderTrackingFrame(fig, frameInput);
+
+    % Whole-step elapsed time = honest "how fast can we process one frame"
+    % metric. Includes frame read + preprocess + LK + cluster + render.
+    elapsedStep = toc(tStep);
+
+    ensureUiOnPath();
+    videoSlider(fig, 'update');
+    if isfield(d.h,'lblFPS') && isvalid(d.h.lblFPS)
+        d.h.lblFPS.Text = computeFPS(elapsedStep);
+    end
 end
 
 function cb_ResetDefaults(fig)
@@ -730,6 +796,40 @@ function cb_ResetDefaults(fig)
     if ~isempty(d.tracking.videoPath)
         resetTrackingToFirstFrame(fig);
     end
+end
+
+function cb_VideoSliderChanging(fig, seconds)
+% Fires continuously while the user is dragging the slider. We stop the
+% playback timer here so it can't overwrite sliderVideo.Value every frame
+% (that was the source of the glitchy feel and the missed-callback bug
+% where releasing on a still-playing-frame value never triggered the
+% ChangedFcn). The time label is updated live for feedback.
+    if ~isvalid(fig), return; end
+    d = fig.UserData;
+    if ~strcmp(d.h.ddCat.Value,'Object Tracking'), return; end
+    if isempty(d.tracking.videoReader), return; end
+
+    stopTrackingTimer(fig);   % idempotent if timer already stopped
+
+    total = d.tracking.videoReader.Duration;
+    seconds = max(0, min(total, seconds));
+    if isfield(d.h,'lblVideoFrame') && isvalid(d.h.lblVideoFrame)
+        d.h.lblVideoFrame.Text = sprintf('Time: %.2f s / %.2f s', seconds, total);
+    end
+end
+
+function cb_VideoSeek(fig, seconds)
+% Slider release handler: jump the video to the chosen time in seconds
+% and auto-resume playback. The timer was already paused by the
+% ValueChangingFcn above, so we just need to seek and restart it.
+    if ~isvalid(fig), return; end
+    d = fig.UserData;
+    if ~strcmp(d.h.ddCat.Value,'Object Tracking'), return; end
+    if isempty(d.tracking.videoReader), return; end
+
+    ensureUiOnPath();
+    videoSlider(fig, 'seek', seconds);
+    cb_PlayTracking(fig);   % always resume on release (auto-play after scrub)
 end
 
 function cb_PyrLevelsChanging(fig, e)
@@ -942,6 +1042,11 @@ function resetTrackingToFirstFrame(fig)
     end
 
     renderTrackingPreview(fig);
+    ensureUiOnPath();
+    videoSlider(fig, 'update');
+    if isfield(d.h,'lblFPS') && isvalid(d.h.lblFPS)
+        d.h.lblFPS.Text = 'FPS: --';
+    end
 end
 
 function renderTrackingPreview(fig)
@@ -1003,9 +1108,18 @@ function renderTrackingFrame(fig, frameInput)
 end
 
 function out = drawFlowOverlay(frame, flow, motionThresh)
-% Draw per-point optical-flow vectors. Green for "moving" points (flow
-% magnitude > motionThresh), gray for stationary. flow is Nx4
-% [oldX oldY newX newY].
+% Draw per-point optical-flow vectors as real arrows (line + filled
+% arrowhead). Green for "moving" points (flow magnitude > motionThresh),
+% gray crosses for stationary. flow is Nx4 [oldX oldY newX newY].
+%
+% Display-only amplification: per-frame LK flow is typically 0.5-3 px,
+% which is invisible at native resolution. We scale the arrow length by
+% DISPLAY_AMPLIFY for the overlay only. The underlying tracker, the
+% clustering, and the motion-threshold check all still use the TRUE
+% (un-amplified) flow vectors.
+
+    DISPLAY_AMPLIFY = 5;   % how many times longer the drawn arrow is vs the real flow
+
     out = toRGBFrame(frame);
     if isempty(flow), return; end
 
@@ -1013,21 +1127,39 @@ function out = drawFlowOverlay(frame, flow, motionThresh)
     mag   = sqrt(sum(disp_.^2, 2));
     moving = mag > motionThresh;
 
-    % Stationary points first (dim gray + tiny dot), then moving arrows
-    % on top in green so they stand out.
+    % Stationary points: dim gray crosses.
     if any(~moving)
         out = insertMarker(out, flow(~moving,3:4), '+', ...
             'Color', [120 120 120], 'Size', 3);
     end
 
     if any(moving)
-        linesXYXY = flow(moving, :);   % [oldX oldY newX newY]
-        out = insertShape(out, 'Line', linesXYXY, ...
+        basePts = flow(moving, 1:2);
+        d       = disp_(moving, :);
+        m       = mag(moving);
+        tipPts  = basePts + d * DISPLAY_AMPLIFY;
+
+        % Arrow shafts: line from base to (amplified) tip.
+        shafts = [basePts, tipPts];
+        out = insertShape(out, 'Line', shafts, ...
             'Color', [0 230 0], 'LineWidth', 1);
-        % Mark the new (current) tip with a small green dot so direction
-        % is visible even on short displacements.
-        out = insertMarker(out, flow(moving,3:4), 'o', ...
-            'Color', [0 230 0], 'Size', 3);
+
+        % Arrowheads: small filled triangle at the tip, pointing along the
+        % motion direction. Use the unit-direction vector and its 90-degree
+        % perpendicular to compute the two base corners of the triangle.
+        unitDir = d ./ max(m, eps);
+        perp    = [-unitDir(:,2), unitDir(:,1)];
+        headLen   = 7;   % px, along the shaft
+        headWidth = 3;   % px, sideways
+        b1 = tipPts - unitDir * headLen + perp * headWidth;
+        b2 = tipPts - unitDir * headLen - perp * headWidth;
+
+        % insertShape 'FilledPolygon' takes [x1 y1 x2 y2 x3 y3] per row.
+        tris = [tipPts(:,1) tipPts(:,2) ...
+                b1(:,1)     b1(:,2)     ...
+                b2(:,1)     b2(:,2)];
+        out = insertShape(out, 'FilledPolygon', tris, ...
+            'Color', [0 230 0], 'Opacity', 1.0);
     end
 end
 
@@ -1083,6 +1215,21 @@ function ensureSceneFlowOnPath()
     if isempty(which('sceneFlow'))
         error('tracking_app:sceneFlowPath', ...
             'Could not find trackers/sceneFlow.m.');
+    end
+end
+
+function ensureUiOnPath()
+    if ~isempty(which('saveButton')) && ~isempty(which('videoSlider')) ...
+            && ~isempty(which('computeFPS'))
+        return;
+    end
+    appDir = fileparts(mfilename('fullpath'));
+    if isempty(appDir)
+        appDir = fileparts(which('tracking_app'));
+    end
+    uiDir = fullfile(appDir, 'ui');
+    if exist(uiDir, 'dir')
+        addpath(uiDir);
     end
 end
 
@@ -1303,13 +1450,17 @@ function configVisibility(fig)
     if ~isTM, cla(d.h.axBBox); end
     newCats = {'Pyramids','Template Matching','Filter Banks','Edge Detection','Corner Detection', ...
                'Blob Detection','HoG','Hough Transform','RANSAC','Stereo Vision','Object Tracking'};
-    d.h.kp.Visible = on_off(~ismember(cat, newCats));
+    d.h.kp.Visible       = on_off(~ismember(cat, newCats));
     d.h.btnLoad.Text = ternary(strcmp(cat,'Object Tracking'),'  Load Video','  Load Image');
     d.h.btnTemplate.Visible = on_off(strcmp(cat,'Template Matching') || strcmp(cat,'Stereo Vision'));
     d.h.btnStep.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnPlay.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnPause.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnStop.Visible = on_off(strcmp(cat,'Object Tracking'));
+    d.h.sliderVideo.Visible   = on_off(strcmp(cat,'Object Tracking'));
+    d.h.lblVideoFrame.Visible = on_off(strcmp(cat,'Object Tracking'));
+    d.h.lblFPS.Visible        = on_off(strcmp(cat,'Object Tracking'));
+    d.h.btnSave.Visible       = on_off(strcmp(cat,'Object Tracking'));
     d.h.lblPyrLevels.Visible       = on_off(strcmp(cat,'Object Tracking'));
     d.h.slPyrLevels.Visible        = on_off(strcmp(cat,'Object Tracking'));
     d.h.lblMotionThresh.Visible    = on_off(strcmp(cat,'Object Tracking'));
