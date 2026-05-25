@@ -4,7 +4,7 @@ function varargout = sceneFlow(mode, varargin)
 % No ROI, no per-object identity. The algorithm follows the textbook LK
 % pipeline from the course slides:
 %
-%   1. Detect Shi-Tomasi corners across the ENTIRE frame.
+%   1. Detect Harris corners across the ENTIRE frame.
 %   2. Run pyramidal Lucas-Kanade between consecutive frames on every
 %      tracked point (handled by vision.PointTracker).
 %   3. Each point's displacement = its optical-flow vector.
@@ -146,8 +146,11 @@ function g = toGray(frame)
 end
 
 function pts = detectCorners(gray, P)
-% Shi-Tomasi corners over the WHOLE frame (no ROI). Capped at maxPoints.
-    f = detectMinEigenFeatures(gray, 'MinQuality', P.minQuality);
+% Harris corners over the WHOLE frame (no ROI). Capped at maxPoints.
+% Uses MATLAB's detectHarrisFeatures, which implements the cornerness
+% measure R = det(M) - k*trace(M)^2 on the second-moment matrix from
+% the course slides.
+    f = detectHarrisFeatures(gray, 'MinQuality', P.minQuality);
     if f.Count > P.maxPoints
         f = selectStrongest(f, P.maxPoints);
     end

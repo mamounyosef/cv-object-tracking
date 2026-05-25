@@ -4,7 +4,7 @@ This project tracks **scene motion**, not user-selected objects. There is no
 ROI. The algorithm follows the textbook Lucas-Kanade flow described in the
 course slides:
 
-1. Detect Shi-Tomasi corners over the **entire frame**.
+1. Detect Harris corners over the **entire frame**.
 2. Run pyramidal Lucas-Kanade between consecutive frames on every tracked
    point.
 3. Each point's frame-to-frame displacement is its optical-flow vector.
