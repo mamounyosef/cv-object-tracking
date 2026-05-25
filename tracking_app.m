@@ -125,6 +125,19 @@ chkLockROI = uicheckbox(cp, ...
     'Position',[PADDING_PANEL y round(244*sx) round(22*sy)], ...
     'FontColor',[0.9 0.9 0.9], 'FontSize',11, ...
     'Value',true, 'Visible','off');
+y = y - round(30*sy);
+
+lblPyrLevels = uilabel(cp, ...
+    'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
+    'Text','KLT Pyramid Levels: 3', ...
+    'FontSize',10,'FontColor',[0.75 0.85 0.95], ...
+    'Visible','off');
+y = y - GAP_LABEL_TO_CONTROL;
+slPyrLevels = uislider(cp, ...
+    'Limits',[1 5], 'Value',3, ...
+    'Position',[PADDING_PANEL y round(244*sx) 3], ...
+    'MajorTicks',[1 2 3 4 5],'MinorTicks',[], ...
+    'Visible','off');
 y = y - GAP_SECTION;
 
 makeLabel(cp,'Category',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT]);
@@ -282,6 +295,7 @@ h = struct( ...
     'btnStep',btnStep, ...
     'btnPlay',btnPlay, 'btnPause',btnPause, 'btnStop',btnStop, ...
     'chkLockROI',chkLockROI, ...
+    'lblPyrLevels',lblPyrLevels, 'slPyrLevels',slPyrLevels, ...
     'chkForceGray',chkForceGray, ...
     'chkHistEq',chkHistEq, ...
     'chkBoxFilt',chkBoxFilt, 'lblBoxSize',lblBoxSize, 'slBoxSize',slBoxSize, ...
@@ -353,6 +367,8 @@ chkGauss.ValueChangedFcn       = @(~,~) cb_GaussToggle(fig);
 slGaussSigma.ValueChangedFcn   = @(~,~) cb_GaussSigmaReleased(fig);
 chkSobelH.ValueChangedFcn      = @(~,~) applyProc(fig);
 chkSobelV.ValueChangedFcn      = @(~,~) applyProc(fig);
+slPyrLevels.ValueChangingFcn   = @(~,e) cb_PyrLevelsChanging(fig,e);
+slPyrLevels.ValueChangedFcn    = @(~,e) cb_PyrLevelsReleased(fig,e);
 fig.CloseRequestFcn = @(src,~) cb_CloseApp(src);
 
 %% ── Init and show ────────────────────────────────────────────────────────
@@ -921,6 +937,21 @@ function trackingStep(fig)
     end
 end
 
+function cb_PyrLevelsChanging(fig, e)
+    d = fig.UserData;
+    d.h.lblPyrLevels.Text = sprintf('KLT Pyramid Levels: %d', round(e.Value));
+end
+
+function cb_PyrLevelsReleased(fig, e)
+    d = fig.UserData;
+    n = max(1, min(5, round(e.Value)));
+    d.h.slPyrLevels.Value = n;
+    d.h.lblPyrLevels.Text = sprintf('KLT Pyramid Levels: %d', n);
+    % NumPyramidLevels is a vision.PointTracker CONSTRUCTOR param, so it
+    % only takes effect when a NEW tracker is initialized (next ROI added,
+    % or after Clear ROIs + Add ROI). Existing trackers keep their value.
+end
+
 function params = getTrackingParams(fig)
     % Build the params struct passed to trackerKLT('init'/'update').
     % Read live GUI controls so toggling them affects the next frame.
@@ -929,6 +960,9 @@ function params = getTrackingParams(fig)
         d = fig.UserData;
         if isfield(d.h,'chkLockROI') && isvalid(d.h.chkLockROI)
             params.lockSize = logical(d.h.chkLockROI.Value);
+        end
+        if isfield(d.h,'slPyrLevels') && isvalid(d.h.slPyrLevels)
+            params.pyrLevels = max(1, min(5, round(d.h.slPyrLevels.Value)));
         end
     end
 end
@@ -1451,6 +1485,8 @@ function configVisibility(fig)
     d.h.btnPause.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnStop.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.chkLockROI.Visible = on_off(strcmp(cat,'Object Tracking'));
+    d.h.lblPyrLevels.Visible = on_off(strcmp(cat,'Object Tracking'));
+    d.h.slPyrLevels.Visible = on_off(strcmp(cat,'Object Tracking'));
     noParamOps = {'Epipolar Lines','Structure from Motion','Lucas-Kanade (KLT)'};
     showParam = ~ismember(op,noP) && ~strcmp(cat,'Color Space') && ~ismember(op,noParamOps);
     d.h.slParam.Visible  = on_off(showParam);
