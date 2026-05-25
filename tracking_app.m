@@ -68,33 +68,11 @@ btnTemplate = uibutton(cp,'push', ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',13, ...
     'Visible','off');
 
-btnROI = uibutton(cp,'push', ...
-    'Text','+ Add ROI', ...
-    'Position',[PADDING_PANEL y round(152*sx) BTN_HEIGHT], ...
-    'BackgroundColor',[0.78 0.52 0.18], ...
-    'FontColor',[1 1 1],'FontWeight','bold','FontSize',13, ...
-    'Visible','off');
-
 btnStep = uibutton(cp,'push', ...
     'Text','▶ Step', ...
-    'Position',[PADDING_PANEL+round(160*sx) y round(84*sx) BTN_HEIGHT], ...
+    'Position',[PADDING_PANEL y round(244*sx) BTN_HEIGHT], ...
     'BackgroundColor',[0.28 0.62 0.38], ...
     'FontColor',[1 1 1],'FontWeight','bold','FontSize',13, ...
-    'Visible','off');
-y = y - round(42*sy);
-
-btnClearROI = uibutton(cp,'push', ...
-    'Text','✕ Clear ROIs', ...
-    'Position',[PADDING_PANEL y round(118*sx) BTN_HEIGHT], ...
-    'BackgroundColor',[0.55 0.30 0.30], ...
-    'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
-    'Visible','off');
-
-btnAutoROI = uibutton(cp,'push', ...
-    'Text','🔍 Auto Detect', ...
-    'Position',[PADDING_PANEL+round(126*sx) y round(118*sx) BTN_HEIGHT], ...
-    'BackgroundColor',[0.22 0.48 0.78], ...
-    'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
     'Visible','off');
 y = y - round(42*sy);
 
@@ -120,13 +98,6 @@ btnStop = uibutton(cp,'push', ...
     'Visible','off');
 y = y - round(36*sy);
 
-chkLockROI = uicheckbox(cp, ...
-    'Text','🔒 Lock ROI size (no auto-resize)', ...
-    'Position',[PADDING_PANEL y round(244*sx) round(22*sy)], ...
-    'FontColor',[0.9 0.9 0.9], 'FontSize',11, ...
-    'Value',true, 'Visible','off');
-y = y - round(30*sy);
-
 lblPyrLevels = uilabel(cp, ...
     'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
     'Text','KLT Pyramid Levels: 3', ...
@@ -137,6 +108,45 @@ slPyrLevels = uislider(cp, ...
     'Limits',[1 5], 'Value',3, ...
     'Position',[PADDING_PANEL y round(244*sx) 3], ...
     'MajorTicks',[1 2 3 4 5],'MinorTicks',[], ...
+    'Visible','off');
+y = y - round(38*sy);
+
+lblMotionThresh = uilabel(cp, ...
+    'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
+    'Text','Motion Threshold: 1.5 px', ...
+    'FontSize',10,'FontColor',[0.75 0.85 0.95], ...
+    'Visible','off');
+y = y - GAP_LABEL_TO_CONTROL;
+slMotionThresh = uislider(cp, ...
+    'Limits',[0.5 10], 'Value',1.5, ...
+    'Position',[PADDING_PANEL y round(244*sx) 3], ...
+    'MajorTicks',[0.5 2 4 6 8 10],'MinorTicks',[], ...
+    'Visible','off');
+y = y - round(38*sy);
+
+lblMinClusterPts = uilabel(cp, ...
+    'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
+    'Text','Min Cluster Size: 5 pts', ...
+    'FontSize',10,'FontColor',[0.75 0.85 0.95], ...
+    'Visible','off');
+y = y - GAP_LABEL_TO_CONTROL;
+slMinClusterPts = uislider(cp, ...
+    'Limits',[3 30], 'Value',5, ...
+    'Position',[PADDING_PANEL y round(244*sx) 3], ...
+    'MajorTicks',[3 5 10 15 20 25 30],'MinorTicks',[], ...
+    'Visible','off');
+y = y - round(38*sy);
+
+lblClusterRadius = uilabel(cp, ...
+    'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
+    'Text','Cluster Radius: 25 px', ...
+    'FontSize',10,'FontColor',[0.75 0.85 0.95], ...
+    'Visible','off');
+y = y - GAP_LABEL_TO_CONTROL;
+slClusterRadius = uislider(cp, ...
+    'Limits',[10 100], 'Value',25, ...
+    'Position',[PADDING_PANEL y round(244*sx) 3], ...
+    'MajorTicks',[10 25 50 75 100],'MinorTicks',[], ...
     'Visible','off');
 y = y - GAP_SECTION;
 
@@ -291,11 +301,12 @@ h = struct( ...
     'slLP',slLP, 'lblLP',lblLP, ...
     'slHP',slHP, 'lblHP',lblHP, ...
     'btnLoad',btnLoad, 'btnTemplate',btnTemplate, ...
-    'btnROI',btnROI, 'btnClearROI',btnClearROI, 'btnAutoROI',btnAutoROI, ...
     'btnStep',btnStep, ...
     'btnPlay',btnPlay, 'btnPause',btnPause, 'btnStop',btnStop, ...
-    'chkLockROI',chkLockROI, ...
-    'lblPyrLevels',lblPyrLevels, 'slPyrLevels',slPyrLevels, ...
+    'lblPyrLevels',lblPyrLevels,         'slPyrLevels',slPyrLevels, ...
+    'lblMotionThresh',lblMotionThresh,   'slMotionThresh',slMotionThresh, ...
+    'lblMinClusterPts',lblMinClusterPts, 'slMinClusterPts',slMinClusterPts, ...
+    'lblClusterRadius',lblClusterRadius, 'slClusterRadius',slClusterRadius, ...
     'chkForceGray',chkForceGray, ...
     'chkHistEq',chkHistEq, ...
     'chkBoxFilt',chkBoxFilt, 'lblBoxSize',lblBoxSize, 'slBoxSize',slBoxSize, ...
@@ -328,25 +339,18 @@ tracking = struct( ...
     'currentFrameRaw',[], ...
     'currentFrameInput',[], ...
     'frameIndex',0, ...
-    'initialBBoxes',{{}}, ...   % cell array of [x y w h] (one per ROI)
-    'currentBBoxes',{{}}, ...   % cell array of [x y w h] (one per active tracker; [] if lost)
-    'trackerStates',{{}}, ...   % cell array of state structs (one per tracker)
-    'initialized',false, ...    % true iff at least one tracker initialized
-    'allLost',false, ...        % true iff every tracker has lost its target
+    'sceneState',[], ...        % state struct returned by sceneFlow('init'/'update')
+    'currentBBoxes',{{}}, ...   % motion-cluster bboxes from the last frame
+    'lastFlow',zeros(0,4), ...  % per-point [oldX oldY newX newY] from the last frame
+    'initialized',false, ...    % true iff sceneFlow('init') ran on the first frame
     'isPlaying',false, ...
-    'timer',[], ...
-    'lastVis',[], ...
-    'autoParams',struct( ...    % last-used Auto-Detect parameters
-        'windowSec',0.5, 'T',25, 'X',40, 'minArea',200, 'minW',15, 'minH',15));
+    'timer',[]);
 fig.UserData = struct('h',h, 'origImg',[], 'procImg',[], 'templateImg',[], ...
     'tracking',tracking, 'sx',sx, 'sy',sy, 'spacing',spacing);
 
 %% ── Wire up callbacks ────────────────────────────────────────────────────
 btnLoad.ButtonPushedFcn     = @(~,~) cb_Load(fig);
 btnTemplate.ButtonPushedFcn = @(~,~) cb_LoadTemplate(fig);
-btnROI.ButtonPushedFcn      = @(~,~) cb_SelectTrackingROI(fig);
-btnClearROI.ButtonPushedFcn = @(~,~) cb_ClearROIs(fig);
-btnAutoROI.ButtonPushedFcn  = @(~,~) cb_OpenAutoDetect(fig);
 btnStep.ButtonPushedFcn     = @(~,~) cb_StepTracking(fig);
 btnPlay.ButtonPushedFcn     = @(~,~) cb_PlayTracking(fig);
 btnPause.ButtonPushedFcn    = @(~,~) cb_PauseTracking(fig);
@@ -367,8 +371,14 @@ chkGauss.ValueChangedFcn       = @(~,~) cb_GaussToggle(fig);
 slGaussSigma.ValueChangedFcn   = @(~,~) cb_GaussSigmaReleased(fig);
 chkSobelH.ValueChangedFcn      = @(~,~) applyProc(fig);
 chkSobelV.ValueChangedFcn      = @(~,~) applyProc(fig);
-slPyrLevels.ValueChangingFcn   = @(~,e) cb_PyrLevelsChanging(fig,e);
-slPyrLevels.ValueChangedFcn    = @(~,e) cb_PyrLevelsReleased(fig,e);
+slPyrLevels.ValueChangingFcn      = @(~,e) cb_PyrLevelsChanging(fig,e);
+slPyrLevels.ValueChangedFcn       = @(~,e) cb_PyrLevelsReleased(fig,e);
+slMotionThresh.ValueChangingFcn   = @(~,e) cb_MotionThreshChanging(fig,e);
+slMotionThresh.ValueChangedFcn    = @(~,e) cb_MotionThreshReleased(fig,e);
+slMinClusterPts.ValueChangingFcn  = @(~,e) cb_MinClusterChanging(fig,e);
+slMinClusterPts.ValueChangedFcn   = @(~,e) cb_MinClusterReleased(fig,e);
+slClusterRadius.ValueChangingFcn  = @(~,e) cb_ClusterRadiusChanging(fig,e);
+slClusterRadius.ValueChangedFcn   = @(~,e) cb_ClusterRadiusReleased(fig,e);
 fig.CloseRequestFcn = @(src,~) cb_CloseApp(src);
 
 %% ── Init and show ────────────────────────────────────────────────────────
@@ -427,19 +437,30 @@ function cb_LoadTrackingVideo(fig)
 
     d = fig.UserData;
     frameInput = preProcess(firstFrame, d.h);
-    d.tracking.videoReader = videoReader;
-    d.tracking.videoPath = videoPath;
-    d.tracking.currentFrameRaw = firstFrame;
+    d.tracking.videoReader       = videoReader;
+    d.tracking.videoPath         = videoPath;
+    d.tracking.currentFrameRaw   = firstFrame;
     d.tracking.currentFrameInput = frameInput;
-    d.tracking.frameIndex = 1;
-    d.tracking.initialBBoxes = {};
-    d.tracking.currentBBoxes = {};
-    d.tracking.trackerStates = {};
-    d.tracking.initialized = false;
-    d.tracking.allLost = false;
-    d.tracking.isPlaying = false;
-    d.tracking.lastVis = [];
+    d.tracking.frameIndex        = 1;
+    d.tracking.sceneState        = [];
+    d.tracking.currentBBoxes     = {};
+    d.tracking.lastFlow          = zeros(0,4);
+    d.tracking.initialized       = false;
+    d.tracking.isPlaying         = false;
     fig.UserData = d;
+
+    % Initialize scene-flow on the first frame: detect Shi-Tomasi corners
+    % across the whole frame and seed the vision.PointTracker.
+    try
+        ensureSceneFlowOnPath();
+        d.tracking.sceneState = sceneFlow('init', frameInput, getTrackingParams(fig));
+        d.tracking.initialized = true;
+        fig.UserData = d;
+    catch err
+        uialert(fig, sprintf('Could not initialize scene-flow tracking.\n\n%s', ...
+            err.message), 'Tracking Init Failed');
+        return;
+    end
 
     renderTrackingPreview(fig);
 end
@@ -453,352 +474,6 @@ function cb_LoadTemplate(fig)
     applyProc(fig);
 end
 
-function cb_SelectTrackingROI(fig)
-    d = fig.UserData;
-    if ~strcmp(d.h.ddCat.Value,'Object Tracking')
-        return;
-    end
-    if isempty(d.tracking.currentFrameInput)
-        uialert(fig, 'Load a tracking video before selecting an ROI.', ...
-            'ROI Selection');
-        return;
-    end
-
-    % Render the first frame with any already-initialized ROIs overlaid, so
-    % the user can see what is already being tracked while drawing the next box.
-    renderTrackingInitialization(fig);
-
-    try
-        roi = drawrectangle(d.h.axOrig);
-        % drawrectangle returns once the user finishes the initial click-drag
-        % (no double-click commit needed). If the user just clicked without
-        % a real drag, treat it as cancelled.
-        if ~isvalid(roi) || isempty(roi.Position) || ...
-                roi.Position(3) < 1 || roi.Position(4) < 1
-            if isvalid(roi), delete(roi); end
-            return;
-        end
-        bbox = clampTrackingBBox(roi.Position, size(d.tracking.currentFrameInput));
-        delete(roi);
-    catch err
-        uialert(fig, sprintf('Could not select the ROI.\n\n%s', err.message), ...
-            'ROI Selection Failed');
-        return;
-    end
-
-    if ~isValidTrackingBBox(bbox)
-        uialert(fig, 'Select an ROI at least 5 pixels wide and 5 pixels high inside the frame.', ...
-            'Invalid ROI');
-        return;
-    end
-
-    % Conflict check: reject if the new ROI overlaps an existing one too much.
-    for i = 1:numel(d.tracking.initialBBoxes)
-        if bboxIoU(bbox, d.tracking.initialBBoxes{i}) > 0.5
-            uialert(fig, sprintf(['The new ROI overlaps tracker %d by more ' ...
-                'than 50%%. Pick a non-overlapping region.'], i), ...
-                'ROI Conflict');
-            return;
-        end
-    end
-
-    trackingInitFromROI(fig, bbox);
-end
-
-function cb_OpenAutoDetect(fig)
-% Opens a modal-style dialog where the user tunes the six auto-detect
-% parameters and either runs the detection or cancels.
-    d = fig.UserData;
-    if ~strcmp(d.h.ddCat.Value,'Object Tracking')
-        return;
-    end
-    if isempty(d.tracking.videoPath) || isempty(d.tracking.currentFrameInput)
-        uialert(fig, 'Load a video first before running auto-detection.', ...
-            'Auto Detect');
-        return;
-    end
-
-    P = d.tracking.autoParams;
-    dlg = uifigure('Name','Auto-Detect Settings', ...
-        'Position',[fig.Position(1)+100 fig.Position(2)+100 420 470], ...
-        'Color',[0.13 0.13 0.16], ...
-        'WindowStyle','modal');
-
-    snapSec = @(x) round(x*10)/10;   % seconds, 1 decimal place
-    snapInt = @(x) round(x);         % integer pixels / frames / gray-levels
-    rows = { ...
-        struct('field','windowSec','label','Window size',            'lo',0.1, 'hi',20,   'fmt','%.1f sec',      'snap',snapSec), ...
-        struct('field','T',        'label','Change threshold (T)',   'lo',5,   'hi',80,   'fmt','%d gray-levels','snap',snapInt), ...
-        struct('field','X',        'label','Max ROI size (X)',       'lo',10,  'hi',300,  'fmt','%d px',         'snap',snapInt), ...
-        struct('field','minArea',  'label','Min blob area',          'lo',50,  'hi',5000, 'fmt','%d px',         'snap',snapInt), ...
-        struct('field','minW',     'label','Min blob width',         'lo',5,   'hi',100,  'fmt','%d px',         'snap',snapInt), ...
-        struct('field','minH',     'label','Min blob height',        'lo',5,   'hi',100,  'fmt','%d px',         'snap',snapInt), ...
-        };
-
-    rowH = 56;
-    yTop = 470 - 30;
-    handles = struct();
-    for k = 1:numel(rows)
-        r = rows{k};
-        yr = yTop - k*rowH;
-        v0 = P.(r.field);
-        uilabel(dlg, 'Position',[20 yr+24 220 18], ...
-            'Text', r.label, 'FontColor',[0.9 0.9 0.9], 'FontSize',11);
-        valLbl = uilabel(dlg, 'Position',[250 yr+24 150 18], ...
-            'Text', sprintf(r.fmt, r.snap(v0)), 'FontColor',[0.7 0.85 1.0], ...
-            'FontSize',11, 'HorizontalAlignment','right');
-        sld = uislider(dlg, 'Position',[20 yr+18 380 3], ...
-            'Limits',[r.lo r.hi], 'Value',v0, ...
-            'MajorTicks',[], 'MinorTicks',[]);
-        snapFn = r.snap;
-        fmt    = r.fmt;
-        sld.ValueChangingFcn = @(s,e) set(valLbl,'Text', sprintf(fmt, snapFn(e.Value)));
-        sld.ValueChangedFcn  = @(s,e) set(valLbl,'Text', sprintf(fmt, snapFn(s.Value)));
-        handles.(r.field) = sld;
-    end
-
-    btnRun = uibutton(dlg,'push', ...
-        'Text','🔍 Run Detection', ...
-        'Position',[20 20 200 40], ...
-        'BackgroundColor',[0.22 0.55 0.32], ...
-        'FontColor',[1 1 1],'FontWeight','bold','FontSize',13);
-    btnCancel = uibutton(dlg,'push', ...
-        'Text','Cancel', ...
-        'Position',[240 20 160 40], ...
-        'BackgroundColor',[0.45 0.45 0.48], ...
-        'FontColor',[1 1 1],'FontWeight','bold','FontSize',13);
-    btnRun.ButtonPushedFcn    = @(~,~) runAutoDetect(fig, dlg, handles);
-    btnCancel.ButtonPushedFcn = @(~,~) delete(dlg);
-end
-
-function runAutoDetect(fig, dlg, handles)
-% Read slider values, persist them, run detection, create one tracker per
-% surviving blob, then close the dialog.
-    d = fig.UserData;
-    P = struct( ...
-        'windowSec', round(handles.windowSec.Value * 10) / 10, ...
-        'T',         round(handles.T.Value), ...
-        'X',         round(handles.X.Value), ...
-        'minArea',   round(handles.minArea.Value), ...
-        'minW',      round(handles.minW.Value), ...
-        'minH',      round(handles.minH.Value));
-    d.tracking.autoParams = P;
-    fig.UserData = d;
-
-    try
-        bboxes = autoDetectROIs(d.tracking.videoPath, P, d.h);
-    catch err
-        if isvalid(dlg), delete(dlg); end
-        uialert(fig, sprintf('Auto-detect failed.\n\n%s', err.message), ...
-            'Auto Detect Failed');
-        return;
-    end
-
-    if isempty(bboxes)
-        if isvalid(dlg), delete(dlg); end
-        uialert(fig, ['No moving objects detected. Try lowering the change ' ...
-            'threshold, increasing the window size, or reducing min area / ' ...
-            'min width / min height.'], 'Auto Detect');
-        return;
-    end
-
-    % Create one tracker per detected bbox. Skip any that overlap (IoU > 0.5)
-    % a bbox that is already being tracked (manual or previously auto-added).
-    nAdded = 0;
-    for i = 1:numel(bboxes)
-        bb = bboxes{i};
-        if ~isValidTrackingBBox(bb), continue; end
-        dd = fig.UserData;
-        skip = false;
-        for j = 1:numel(dd.tracking.initialBBoxes)
-            if bboxIoU(bb, dd.tracking.initialBBoxes{j}) > 0.5
-                skip = true; break;
-            end
-        end
-        if skip, continue; end
-        trackingInitFromROI(fig, bb);
-        nAdded = nAdded + 1;
-    end
-
-    if isvalid(dlg), delete(dlg); end
-
-    if nAdded == 0
-        uialert(fig, ['Detected blobs were rejected (KLT could not find ' ...
-            'enough corners or they overlapped existing trackers).'], ...
-            'Auto Detect');
-    end
-end
-
-function bboxes = autoDetectROIs(videoPath, P, h)
-% Frame-differencing auto-ROI detector with temporal memory and spatial crop.
-%
-% Algorithm:
-%   1. Read first N frames (N = windowSec * videoFPS).
-%   2. For each consecutive pair, compute |frame_{k+1} - frame_k|.
-%   3. For each pixel, remember the FIRST frame index in which its diff
-%      exceeded threshold T (0 = never moved).
-%   4. Connected-component the "ever moved" mask -> one big blob per object.
-%   5. For each blob:
-%        a) Find pixels stamped with the EARLIEST frame in this blob.
-%        b) Take the centroid of those pixels - this is where the object
-%           first appeared.
-%        c) Keep only blob pixels inside an X-by-X spatial window centered
-%           on that centroid (X is the user-set "Max ROI size" in pixels).
-%        d) Bounding box of the kept pixels = the ROI.
-%   6. Filter ROIs by minArea, minW, minH.
-
-    bboxes = {};
-    v = VideoReader(videoPath);
-    % Convert the user-facing "window size in seconds" to a concrete frame
-    % count using the video's own frame rate, then clamp to what the file
-    % actually has. We always scan at least 2 frames (else no diff is possible).
-    fps = v.FrameRate;
-    if ~(isnumeric(fps) && isfinite(fps) && fps > 0), fps = 30; end  % safe fallback
-    Nrequest = round(P.windowSec * fps);
-    N = min(max(2, Nrequest), max(2, floor(v.NumFrames)));
-    if N < 2, return; end
-
-    % Read N frames, apply the same preprocessing (gray, hist-eq, etc.) the
-    % rest of the app uses, so detection sees what tracking will see.
-    frames = cell(1, N);
-    for k = 1:N
-        if ~hasFrame(v), break; end
-        frames{k} = preProcess(readFrame(v), h);
-    end
-    frames = frames(~cellfun(@isempty, frames));
-    nF = numel(frames);
-    if nF < 2, return; end
-
-    % Per-pixel earliest-motion frame index (0 = never moved)
-    [H, W, ~] = size(frames{1});
-    firstMotion = zeros(H, W, 'uint16');
-
-    % Per-frame noise floor: small isolated diff specks are rejected BEFORE
-    % they get stamped into firstMotion. Without this, lowering T let
-    % compression artefacts on road markings / shadows / sensor noise fire
-    % at random frame 2, polluting the "earliest motion" centroid so the
-    % X-by-X window landed on a road edge instead of the car.
-    % The floor scales with minArea so it stays consistent across videos.
-    noiseFloorArea = max(15, floor(P.minArea / 6));
-
-    grayPrev = autoGray(frames{1});
-    for k = 2:nF
-        grayCurr = autoGray(frames{k});
-        diff = abs(double(grayCurr) - double(grayPrev));
-        moved = diff > P.T;
-        % Drop isolated noise specks BEFORE stamping firstMotion.
-        moved = bwareaopen(moved, noiseFloorArea);
-        newlyMoved = moved & (firstMotion == 0);
-        firstMotion(newlyMoved) = uint16(k);
-        grayPrev = grayCurr;
-    end
-
-    trailMask = firstMotion > 0;
-    if ~any(trailMask, 'all'), return; end
-
-    % Belt-and-braces: also clean the final trail mask (catches leftover
-    % thin connections that survived per-frame filtering).
-    trailMask = bwareaopen(trailMask, max(10, floor(P.minArea / 8)));
-
-    cc = bwconncomp(trailMask);
-    if cc.NumObjects == 0, return; end
-    stats = regionprops(cc, 'PixelIdxList', 'Area');
-
-    for i = 1:numel(stats)
-        if stats(i).Area < P.minArea, continue; end
-
-        blobIdx    = stats(i).PixelIdxList;
-        blobFrames = firstMotion(blobIdx);
-        valid      = blobFrames > 0;
-        if ~any(valid), continue; end
-
-        % Centroid of the EARLIEST-stamped pixels in this blob: this is the
-        % spatial origin of the object's motion.
-        earliest = min(blobFrames(valid));
-        seedIdx  = blobIdx(blobFrames == earliest);
-        [sy, sx] = ind2sub([H W], seedIdx);
-        cy = mean(sy);
-        cx = mean(sx);
-
-        % X-by-X spatial window centered on the seed centroid (clamped).
-        half = P.X / 2;
-        yLo = max(1, round(cy - half));
-        yHi = min(H, round(cy + half));
-        xLo = max(1, round(cx - half));
-        xHi = min(W, round(cx + half));
-
-        % Keep only blob pixels inside the window.
-        [allY, allX] = ind2sub([H W], blobIdx);
-        inWin = (allY >= yLo) & (allY <= yHi) & ...
-                (allX >= xLo) & (allX <= xHi);
-        if ~any(inWin), continue; end
-
-        keepY = allY(inWin);
-        keepX = allX(inWin);
-        y1 = min(keepY); y2 = max(keepY);
-        x1 = min(keepX); x2 = max(keepX);
-        bw = x2 - x1 + 1;
-        bh = y2 - y1 + 1;
-
-        if bw < P.minW || bh < P.minH, continue; end
-
-        bboxes{end+1} = double([x1 y1 bw bh]); %#ok<AGROW>
-    end
-end
-
-function g = autoGray(f)
-    if size(f,3) == 3
-        g = rgb2gray(f);
-    else
-        g = f;
-    end
-end
-
-function cb_ClearROIs(fig)
-    d = fig.UserData;
-    if ~strcmp(d.h.ddCat.Value,'Object Tracking')
-        return;
-    end
-    stopTrackingTimer(fig);
-    d.tracking.initialBBoxes = {};
-    d.tracking.currentBBoxes = {};
-    d.tracking.trackerStates = {};
-    d.tracking.initialized = false;
-    d.tracking.allLost = false;
-    d.tracking.isPlaying = false;
-    d.tracking.lastVis = [];
-    fig.UserData = d;
-    resetTrackingToFirstFrame(fig);
-end
-
-function trackingInitFromROI(fig, bbox)
-    d = fig.UserData;
-    frameInput = d.tracking.currentFrameInput;
-    if isempty(frameInput), return; end
-
-    params = getTrackingParams(fig);
-    try
-        ensureKLTTrackerOnPath();
-        state = trackerKLT('init', frameInput, bbox, params);
-        if ~isfield(state,'points') || size(state.points,1) < 3
-            error('tracking_app:tooFewKLTPoints', ...
-                'The ROI has too few KLT points. Select a more textured region.');
-        end
-    catch err
-        uialert(fig, sprintf('Could not initialize the KLT tracker.\n\n%s', err.message), ...
-            'KLT Initialization Failed');
-        return;
-    end
-
-    d.tracking.initialBBoxes{end+1} = bbox;
-    d.tracking.currentBBoxes{end+1} = bbox;
-    d.tracking.trackerStates{end+1} = state;
-    d.tracking.initialized = true;
-    d.tracking.allLost = false;
-    fig.UserData = d;
-
-    renderTrackingInitialization(fig);
-end
 
 function cb_StepTracking(fig)
     d = fig.UserData;
@@ -810,8 +485,8 @@ function cb_StepTracking(fig)
             'Tracking Step');
         return;
     end
-    if ~d.tracking.initialized || isempty(d.tracking.trackerStates)
-        uialert(fig, 'Select a valid ROI before stepping KLT tracking.', ...
+    if ~d.tracking.initialized
+        uialert(fig, 'Tracking has not been initialized. Reload the video.', ...
             'Tracking Step');
         return;
     end
@@ -829,13 +504,8 @@ function cb_PlayTracking(fig)
             'Tracking Playback');
         return;
     end
-    if ~d.tracking.initialized || isempty(d.tracking.trackerStates)
-        uialert(fig, 'Select a valid ROI before playing KLT tracking.', ...
-            'Tracking Playback');
-        return;
-    end
-    if d.tracking.allLost
-        uialert(fig, 'All tracks are lost. Stop and select new ROIs before playback.', ...
+    if ~d.tracking.initialized
+        uialert(fig, 'Tracking has not been initialized. Reload the video.', ...
             'Tracking Playback');
         return;
     end
@@ -908,33 +578,26 @@ function trackingStep(fig)
     frameInput = preProcess(frameRaw, d.h);
     params = getTrackingParams(fig);
 
-    nTrackers = numel(d.tracking.trackerStates);
-    ensureKLTTrackerOnPath();
-    for i = 1:nTrackers
-        try
-            [state_i, bbox_i, ~] = trackerKLT('update', frameInput, ...
-                d.tracking.trackerStates{i}, params);
-        catch
-            % Isolate per-tracker failure: mark this one lost and keep going
-            % so other tracks are not killed by one tracker's exception.
-            state_i = d.tracking.trackerStates{i};
-            if isstruct(state_i), state_i.lost = true; end
-            bbox_i  = [];
-        end
-        d.tracking.trackerStates{i} = state_i;
-        d.tracking.currentBBoxes{i} = bbox_i;   % [] if lost
+    ensureSceneFlowOnPath();
+    try
+        [sceneState, bboxes, flow] = sceneFlow('update', frameInput, ...
+            d.tracking.sceneState, params);
+    catch err
+        stopTrackingTimer(fig);
+        uialert(fig, sprintf('Scene-flow update failed.\n\n%s', err.message), ...
+            'Tracking Step Failed');
+        return;
     end
 
-    d.tracking.frameIndex = d.tracking.frameIndex + 1;
-    d.tracking.currentFrameRaw = frameRaw;
+    d.tracking.sceneState        = sceneState;
+    d.tracking.currentBBoxes     = bboxes;
+    d.tracking.lastFlow          = flow;
+    d.tracking.frameIndex        = d.tracking.frameIndex + 1;
+    d.tracking.currentFrameRaw   = frameRaw;
     d.tracking.currentFrameInput = frameInput;
-    d.tracking.allLost = all(cellfun(@isempty, d.tracking.currentBBoxes));
     fig.UserData = d;
 
     renderTrackingFrame(fig, frameInput);
-    if d.tracking.allLost
-        stopTrackingTimer(fig);
-    end
 end
 
 function cb_PyrLevelsChanging(fig, e)
@@ -947,22 +610,62 @@ function cb_PyrLevelsReleased(fig, e)
     n = max(1, min(5, round(e.Value)));
     d.h.slPyrLevels.Value = n;
     d.h.lblPyrLevels.Text = sprintf('KLT Pyramid Levels: %d', n);
-    % NumPyramidLevels is a vision.PointTracker CONSTRUCTOR param, so it
-    % only takes effect when a NEW tracker is initialized (next ROI added,
-    % or after Clear ROIs + Add ROI). Existing trackers keep their value.
+    % NumPyramidLevels is a vision.PointTracker CONSTRUCTOR parameter, so
+    % it only takes effect on the NEXT init - i.e. when a new video is
+    % loaded (or Stop is pressed, which re-inits from the first frame).
+end
+
+function cb_MotionThreshChanging(fig, e)
+    d = fig.UserData;
+    d.h.lblMotionThresh.Text = sprintf('Motion Threshold: %.1f px', e.Value);
+end
+function cb_MotionThreshReleased(fig, e)
+    d = fig.UserData;
+    v = round(e.Value * 10) / 10;
+    d.h.slMotionThresh.Value = v;
+    d.h.lblMotionThresh.Text = sprintf('Motion Threshold: %.1f px', v);
+end
+
+function cb_MinClusterChanging(fig, e)
+    d = fig.UserData;
+    d.h.lblMinClusterPts.Text = sprintf('Min Cluster Size: %d pts', round(e.Value));
+end
+function cb_MinClusterReleased(fig, e)
+    d = fig.UserData;
+    n = max(3, min(30, round(e.Value)));
+    d.h.slMinClusterPts.Value = n;
+    d.h.lblMinClusterPts.Text = sprintf('Min Cluster Size: %d pts', n);
+end
+
+function cb_ClusterRadiusChanging(fig, e)
+    d = fig.UserData;
+    d.h.lblClusterRadius.Text = sprintf('Cluster Radius: %d px', round(e.Value));
+end
+function cb_ClusterRadiusReleased(fig, e)
+    d = fig.UserData;
+    r = max(10, min(100, round(e.Value)));
+    d.h.slClusterRadius.Value = r;
+    d.h.lblClusterRadius.Text = sprintf('Cluster Radius: %d px', r);
 end
 
 function params = getTrackingParams(fig)
-    % Build the params struct passed to trackerKLT('init'/'update').
-    % Read live GUI controls so toggling them affects the next frame.
+    % Build the params struct passed to sceneFlow('init'/'update').
+    % Read live GUI controls each call so slider changes take effect on
+    % the very next frame.
     params = struct();
     if isvalid(fig)
         d = fig.UserData;
-        if isfield(d.h,'chkLockROI') && isvalid(d.h.chkLockROI)
-            params.lockSize = logical(d.h.chkLockROI.Value);
-        end
         if isfield(d.h,'slPyrLevels') && isvalid(d.h.slPyrLevels)
             params.pyrLevels = max(1, min(5, round(d.h.slPyrLevels.Value)));
+        end
+        if isfield(d.h,'slMotionThresh') && isvalid(d.h.slMotionThresh)
+            params.motionThresh = round(d.h.slMotionThresh.Value * 10) / 10;
+        end
+        if isfield(d.h,'slMinClusterPts') && isvalid(d.h.slMinClusterPts)
+            params.minClusterPts = max(3, min(30, round(d.h.slMinClusterPts.Value)));
+        end
+        if isfield(d.h,'slClusterRadius') && isvalid(d.h.slClusterRadius)
+            params.clusterRadius = max(10, min(100, round(d.h.slClusterRadius.Value)));
         end
     end
 end
@@ -1038,188 +741,139 @@ function resetTrackingToFirstFrame(fig)
         return;
     end
 
-    d.tracking.videoReader = videoReader;
-    d.tracking.currentFrameRaw = firstFrame;
-    d.tracking.currentFrameInput = preProcess(firstFrame, d.h);
-    d.tracking.frameIndex = 1;
-    d.tracking.initialBBoxes = {};
-    d.tracking.currentBBoxes = {};
-    d.tracking.trackerStates = {};
-    d.tracking.initialized = false;
-    d.tracking.allLost = false;
-    d.tracking.isPlaying = false;
-    d.tracking.timer = [];
-    d.tracking.lastVis = [];
+    frameInput = preProcess(firstFrame, d.h);
+    d.tracking.videoReader       = videoReader;
+    d.tracking.currentFrameRaw   = firstFrame;
+    d.tracking.currentFrameInput = frameInput;
+    d.tracking.frameIndex        = 1;
+    d.tracking.sceneState        = [];
+    d.tracking.currentBBoxes     = {};
+    d.tracking.lastFlow          = zeros(0,4);
+    d.tracking.initialized       = false;
+    d.tracking.isPlaying         = false;
+    d.tracking.timer             = [];
     fig.UserData = d;
+
+    % Re-seed scene-flow from the (new) first frame using the live slider
+    % values; lets the user change Pyramid Levels and have it apply.
+    try
+        ensureSceneFlowOnPath();
+        d.tracking.sceneState = sceneFlow('init', frameInput, getTrackingParams(fig));
+        d.tracking.initialized = true;
+        fig.UserData = d;
+    catch err
+        uialert(fig, sprintf('Could not re-initialize scene-flow.\n\n%s', ...
+            err.message), 'Tracking Reset Failed');
+        return;
+    end
 
     renderTrackingPreview(fig);
 end
 
 function renderTrackingPreview(fig)
+% Initial display right after loading the video (no per-frame motion yet).
     d = fig.UserData;
     if isempty(d.tracking.currentFrameInput), return; end
 
-    d.h.lblAxOrig.Text = 'Tracking Input';
-    d.h.lblAxFilt.Text = 'KLT Points';
-    d.h.lblAxProc.Text = 'Tracked Object';
+    d.h.lblAxOrig.Text = 'Input Frame';
+    d.h.lblAxFilt.Text = 'Optical Flow';
+    d.h.lblAxProc.Text = 'Motion Clusters';
 
     imshow(d.tracking.currentFrameInput, 'Parent', d.h.axOrig);
-    clearTrackingPreviewAxis(d.h.axFilt, 'Select ROI to initialize KLT points.');
-    clearTrackingPreviewAxis(d.h.axProc, 'Tracked output appears after ROI initialization.');
-end
 
-function renderTrackingInitialization(fig)
-    d = fig.UserData;
-    frameInput = d.tracking.currentFrameInput;
-    if isempty(frameInput), return; end
-
-    d.h.lblAxOrig.Text = 'Tracking Input';
-    d.h.lblAxFilt.Text = 'KLT Points';
-    d.h.lblAxProc.Text = 'Tracked Objects';
-
-    imshow(frameInput, 'Parent', d.h.axOrig);
-
-    vis = drawAllKLTVis(frameInput, d.tracking.trackerStates, d.tracking.currentBBoxes);
-    if isempty(vis)
-        imshow(frameInput, 'Parent', d.h.axFilt);
-    else
-        imshow(vis, 'Parent', d.h.axFilt);
-        d.tracking.lastVis = vis;
+    % Show the corners that were detected on init (no flow yet, no motion).
+    pts = [];
+    if isstruct(d.tracking.sceneState) && isfield(d.tracking.sceneState,'points')
+        pts = d.tracking.sceneState.points;
     end
+    flowVis = toRGBFrame(d.tracking.currentFrameInput);
+    if ~isempty(pts)
+        flowVis = insertMarker(flowVis, pts, '+', 'Color', [180 180 180], 'Size', 4);
+    end
+    imshow(flowVis, 'Parent', d.h.axFilt);
 
-    imshow(drawTrackingBBoxes(frameInput, d.tracking.currentBBoxes), ...
-        'Parent', d.h.axProc);
-    fig.UserData = d;
+    imshow(d.tracking.currentFrameInput, 'Parent', d.h.axProc);
+    d.h.axProc.Title.String = 'Press Play to start tracking';
 end
 
 function renderTrackingFrame(fig, frameInput)
+% Per-frame render during Step / Play.
+%   axOrig : the input frame (post-preprocessing)
+%   axFilt : the same frame with per-point optical-flow arrows overlaid;
+%            colored GREEN where the point is moving (flow > motionThresh),
+%            dim GRAY for stationary points. Matches the slides' quiver
+%            visualisation of LK output.
+%   axProc : the input frame with one axis-aligned bbox per motion cluster.
     d = fig.UserData;
-    d.h.lblAxOrig.Text = 'Tracking Input';
-    d.h.lblAxFilt.Text = 'KLT Points';
-    d.h.lblAxProc.Text = 'Tracked Objects';
+    d.h.lblAxOrig.Text = 'Input Frame';
+    d.h.lblAxFilt.Text = 'Optical Flow';
+    d.h.lblAxProc.Text = 'Motion Clusters';
 
     imshow(frameInput, 'Parent', d.h.axOrig);
 
-    vis = drawAllKLTVis(frameInput, d.tracking.trackerStates, d.tracking.currentBBoxes);
-    if isempty(vis)
-        imshow(frameInput, 'Parent', d.h.axFilt);
-    else
-        imshow(vis, 'Parent', d.h.axFilt);
-        d.tracking.lastVis = vis;
-    end
+    params  = getTrackingParams(fig);
+    if ~isfield(params,'motionThresh'), params.motionThresh = 1.5; end
 
-    imshow(drawTrackingBBoxes(frameInput, d.tracking.currentBBoxes), ...
-        'Parent', d.h.axProc);
+    flowVis = drawFlowOverlay(frameInput, d.tracking.lastFlow, params.motionThresh);
+    imshow(flowVis, 'Parent', d.h.axFilt);
 
-    if d.tracking.allLost
-        d.h.axProc.Title.String = 'All Tracks Lost';
-        text(d.h.axProc, 0.5, 0.5, 'All Tracks Lost', ...
-            'Units','normalized', ...
-            'Color',[1 0.45 0.25], ...
-            'FontSize',14, ...
-            'FontWeight','bold', ...
-            'HorizontalAlignment','center', ...
-            'VerticalAlignment','middle');
+    bboxVis = drawClusterBoxes(frameInput, d.tracking.currentBBoxes);
+    imshow(bboxVis, 'Parent', d.h.axProc);
+
+    nClusters = numel(d.tracking.currentBBoxes);
+    if nClusters == 0
+        d.h.axProc.Title.String = 'No Motion Detected';
     else
-        nLost = sum(cellfun(@isempty, d.tracking.currentBBoxes));
-        if nLost > 0
-            d.h.axProc.Title.String = sprintf('Tracked Objects (%d lost)', nLost);
-        else
-            d.h.axProc.Title.String = 'Tracked Objects';
-        end
+        d.h.axProc.Title.String = sprintf('Motion Clusters: %d', nClusters);
     end
-    fig.UserData = d;
 end
 
-function out = drawTrackingBBoxes(frame, bboxes)
+function out = drawFlowOverlay(frame, flow, motionThresh)
+% Draw per-point optical-flow vectors. Green for "moving" points (flow
+% magnitude > motionThresh), gray for stationary. flow is Nx4
+% [oldX oldY newX newY].
     out = toRGBFrame(frame);
-    if isempty(bboxes)
-        return;
+    if isempty(flow), return; end
+
+    disp_ = flow(:,3:4) - flow(:,1:2);
+    mag   = sqrt(sum(disp_.^2, 2));
+    moving = mag > motionThresh;
+
+    % Stationary points first (dim gray + tiny dot), then moving arrows
+    % on top in green so they stand out.
+    if any(~moving)
+        out = insertMarker(out, flow(~moving,3:4), '+', ...
+            'Color', [120 120 120], 'Size', 3);
     end
+
+    if any(moving)
+        linesXYXY = flow(moving, :);   % [oldX oldY newX newY]
+        out = insertShape(out, 'Line', linesXYXY, ...
+            'Color', [0 230 0], 'LineWidth', 1);
+        % Mark the new (current) tip with a small green dot so direction
+        % is visible even on short displacements.
+        out = insertMarker(out, flow(moving,3:4), 'o', ...
+            'Color', [0 230 0], 'Size', 3);
+    end
+end
+
+function out = drawClusterBoxes(frame, bboxes)
+% Draw one axis-aligned bbox per motion cluster, plus a numbered label.
+    out = toRGBFrame(frame);
+    if isempty(bboxes), return; end
     for i = 1:numel(bboxes)
         b = bboxes{i};
         if isempty(b), continue; end
-        c = trackColor(i);
+        c = clusterColor(i);
         out = insertShape(out, 'Rectangle', b, 'Color', c, 'LineWidth', 2);
-        % ID label in the top-left corner of the box
         out = insertText(out, [b(1), b(2)], sprintf(' %d ', i), ...
             'FontSize', 14, 'BoxColor', c, 'BoxOpacity', 0.85, ...
             'TextColor', [0 0 0]);
     end
 end
 
-function clearTrackingPreviewAxis(ax, msg)
-    cla(ax);
-    text(ax, 0.5, 0.5, msg, ...
-        'Units','normalized', ...
-        'Color',[0.75 0.85 1.0], ...
-        'FontSize',12, ...
-        'HorizontalAlignment','center', ...
-        'VerticalAlignment','middle');
-end
-
-function bbox = clampTrackingBBox(pos, frameSize)
-    bbox = [];
-    if numel(pos) ~= 4 || any(~isfinite(pos))
-        return;
-    end
-
-    H = frameSize(1);
-    W = frameSize(2);
-    x1 = max(1, pos(1));
-    y1 = max(1, pos(2));
-    x2 = min(W, pos(1) + pos(3));
-    y2 = min(H, pos(2) + pos(4));
-    bbox = [x1 y1 x2-x1 y2-y1];
-end
-
-function tf = isValidTrackingBBox(bbox)
-    tf = numel(bbox) == 4 && all(isfinite(bbox)) && bbox(3) >= 5 && bbox(4) >= 5;
-end
-
-function out = drawAllKLTVis(frame, states, bboxes)
-% Overlay all tracker point clouds (per-track color) plus their bboxes.
-    if isempty(states)
-        out = [];
-        return;
-    end
-
-    out = toRGBFrame(frame);
-    anyDrawn = false;
-    for i = 1:numel(states)
-        s = states{i};
-        c = trackColor(i);
-        if ~isempty(s) && isfield(s,'points') && ~isempty(s.points)
-            out = insertMarker(out, s.points, '+', 'Color', c, 'Size', 5);
-            anyDrawn = true;
-        end
-        if i <= numel(bboxes) && ~isempty(bboxes{i})
-            out = insertShape(out, 'Rectangle', bboxes{i}, ...
-                'Color', c, 'LineWidth', 2);
-            anyDrawn = true;
-        end
-    end
-    if ~anyDrawn
-        out = [];
-    end
-end
-
-function iou = bboxIoU(a, b)
-% Intersection-over-union between two [x y w h] boxes.
-    if isempty(a) || isempty(b), iou = 0; return; end
-    ax2 = a(1) + a(3); ay2 = a(2) + a(4);
-    bx2 = b(1) + b(3); by2 = b(2) + b(4);
-    ix1 = max(a(1), b(1)); iy1 = max(a(2), b(2));
-    ix2 = min(ax2, bx2);   iy2 = min(ay2, by2);
-    iw = max(0, ix2 - ix1);
-    ih = max(0, iy2 - iy1);
-    inter = iw * ih;
-    uni = a(3) * a(4) + b(3) * b(4) - inter;
-    if uni <= 0, iou = 0; else, iou = inter / uni; end
-end
-
-function c = trackColor(id)
-% Stable palette so each tracker keeps its color across frames.
+function c = clusterColor(id)
+% Stable palette for per-cluster bbox colours.
     palette = uint8([ ...
         255 230   0;   % yellow
          30 200 255;   % cyan
@@ -1240,8 +894,8 @@ function out = toRGBFrame(frame)
     end
 end
 
-function ensureKLTTrackerOnPath()
-    if ~isempty(which('trackerKLT'))
+function ensureSceneFlowOnPath()
+    if ~isempty(which('sceneFlow'))
         return;
     end
     appDir = fileparts(mfilename('fullpath'));
@@ -1249,11 +903,12 @@ function ensureKLTTrackerOnPath()
         appDir = fileparts(which('tracking_app'));
     end
     trackerDir = fullfile(appDir, 'trackers');
-    if exist(fullfile(trackerDir, 'trackerKLT.m'), 'file')
+    if exist(fullfile(trackerDir, 'sceneFlow.m'), 'file')
         addpath(trackerDir);
     end
-    if isempty(which('trackerKLT'))
-        error('tracking_app:kltPath', 'Could not find trackers/trackerKLT.m.');
+    if isempty(which('sceneFlow'))
+        error('tracking_app:sceneFlowPath', ...
+            'Could not find trackers/sceneFlow.m.');
     end
 end
 
@@ -1296,7 +951,7 @@ function cb_CatChanged(fig)
         case 'Stereo Vision'
             d.h.ddOp.Items = {'Epipolar Lines','Disparity Map','Scanline Matching','Structure from Motion'};
         case 'Object Tracking'
-            d.h.ddOp.Items = {'Lucas-Kanade (KLT)'};
+            d.h.ddOp.Items = {'Scene Motion (LK)'};
     end
     fig.UserData = d;
     configSlider(fig);
@@ -1477,17 +1132,19 @@ function configVisibility(fig)
     d.h.kp.Visible = on_off(~ismember(cat, newCats));
     d.h.btnLoad.Text = ternary(strcmp(cat,'Object Tracking'),'  Load Video','  Load Image');
     d.h.btnTemplate.Visible = on_off(strcmp(cat,'Template Matching') || strcmp(cat,'Stereo Vision'));
-    d.h.btnROI.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.btnClearROI.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.btnAutoROI.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnStep.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnPlay.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnPause.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnStop.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.chkLockROI.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblPyrLevels.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slPyrLevels.Visible = on_off(strcmp(cat,'Object Tracking'));
-    noParamOps = {'Epipolar Lines','Structure from Motion','Lucas-Kanade (KLT)'};
+    d.h.lblPyrLevels.Visible       = on_off(strcmp(cat,'Object Tracking'));
+    d.h.slPyrLevels.Visible        = on_off(strcmp(cat,'Object Tracking'));
+    d.h.lblMotionThresh.Visible    = on_off(strcmp(cat,'Object Tracking'));
+    d.h.slMotionThresh.Visible     = on_off(strcmp(cat,'Object Tracking'));
+    d.h.lblMinClusterPts.Visible   = on_off(strcmp(cat,'Object Tracking'));
+    d.h.slMinClusterPts.Visible    = on_off(strcmp(cat,'Object Tracking'));
+    d.h.lblClusterRadius.Visible   = on_off(strcmp(cat,'Object Tracking'));
+    d.h.slClusterRadius.Visible    = on_off(strcmp(cat,'Object Tracking'));
+    noParamOps = {'Epipolar Lines','Structure from Motion','Scene Motion (LK)'};
     showParam = ~ismember(op,noP) && ~strcmp(cat,'Color Space') && ~ismember(op,noParamOps);
     d.h.slParam.Visible  = on_off(showParam);
     d.h.lblParam.Visible = on_off(showParam);
@@ -1650,7 +1307,7 @@ threeAxes = {'Laplacian 1st','Laplacian 2nd','Boosting', ...
              'Gabor Bank', ...
              'Sobel (edge)','Prewitt (edge)','Roberts', ...
              'Epipolar Lines','Disparity Map','Structure from Motion', ...
-             'Lucas-Kanade (KLT)', ...
+             'Scene Motion (LK)', ...
              };
 showFilt = ismember(op,threeAxes);
 d.h.axFilt.Visible    = ternary(showFilt,'on','off');
@@ -1741,14 +1398,23 @@ end
 fig.UserData = d;
 
     if strcmp(cat,'Object Tracking')
-        % Refresh the cached first-frame view with current preprocessing
-        % settings (so toggling Grayscale / Gaussian / etc. after loading
-        % the video propagates to KLT init and auto-detect previews).
-        % Only safe before any tracker is initialized — once tracking has
-        % started, changing preprocessing would invalidate the tracker
-        % state, so we leave the cached frame alone.
-        if ~isempty(d.tracking.currentFrameRaw) && ~d.tracking.initialized
+        % Refresh the cached first-frame view + re-seed scene-flow whenever
+        % a preprocessing setting (Grayscale, Gaussian, etc.) changes, but
+        % only while we're still on the first frame. Once the timer has
+        % advanced past frame 1, mid-stream changes are taken automatically
+        % on the next trackingStep (preProcess runs every frame).
+        if ~isempty(d.tracking.currentFrameRaw) && d.tracking.frameIndex <= 1
             d.tracking.currentFrameInput = preProcess(d.tracking.currentFrameRaw, d.h);
+            try
+                ensureSceneFlowOnPath();
+                d.tracking.sceneState  = sceneFlow('init', ...
+                    d.tracking.currentFrameInput, getTrackingParams(fig));
+                d.tracking.initialized = true;
+            catch
+                % If the user's preprocessing produced a degenerate frame,
+                % silently leave the previous state in place rather than
+                % popping an alert from a passive UI callback.
+            end
             fig.UserData = d;
             renderTrackingPreview(fig);
         end
