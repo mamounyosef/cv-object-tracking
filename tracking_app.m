@@ -158,16 +158,16 @@ sliderVideo = uislider(fig, ...
     'MajorTicks',[],'MinorTicks',[], ...
     'Visible','off');
 
-lblPyrLevels = uilabel(cpInner, ...
+lblNoiseThresh = uilabel(cpInner, ...
     'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
-    'Text','KLT Pyramid Levels: 3', ...
+    'Text','LK Noise Threshold: 0.009', ...
     'FontSize',10,'FontColor',[0.75 0.85 0.95], ...
     'Visible','off');
 y = y - GAP_LABEL_TO_CONTROL;
-slPyrLevels = uislider(cpInner, ...
-    'Limits',[1 5], 'Value',3, ...
+slNoiseThresh = uislider(cpInner, ...
+    'Limits',[0.0001 0.05], 'Value',0.009, ...
     'Position',[PADDING_PANEL y round(244*sx) 3], ...
-    'MajorTicks',[1 2 3 4 5],'MinorTicks',[], ...
+    'MajorTicks',[0.0001 0.001 0.005 0.01 0.02 0.05],'MinorTicks',[], ...
     'Visible','off');
 y = y - round(58*sy);
 
@@ -184,55 +184,29 @@ slMotionThresh = uislider(cpInner, ...
     'Visible','off');
 y = y - round(58*sy);
 
-lblMinClusterPts = uilabel(cpInner, ...
+lblMinBlobArea = uilabel(cpInner, ...
     'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
-    'Text','Min Cluster Size: 5 pts', ...
+    'Text','Min Blob Area: 200 px²', ...
     'FontSize',10,'FontColor',[0.75 0.85 0.95], ...
     'Visible','off');
 y = y - GAP_LABEL_TO_CONTROL;
-slMinClusterPts = uislider(cpInner, ...
-    'Limits',[3 30], 'Value',5, ...
+slMinBlobArea = uislider(cpInner, ...
+    'Limits',[20 5000], 'Value',200, ...
     'Position',[PADDING_PANEL y round(244*sx) 3], ...
-    'MajorTicks',[3 5 10 15 20 25 30],'MinorTicks',[], ...
+    'MajorTicks',[20 200 500 1000 2000 5000],'MinorTicks',[], ...
     'Visible','off');
 y = y - round(58*sy);
 
-lblClusterRadius = uilabel(cpInner, ...
+lblMergeRadius = uilabel(cpInner, ...
     'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
-    'Text','Cluster Radius: 25 px', ...
+    'Text','Blob Merge Radius: 5 px', ...
     'FontSize',10,'FontColor',[0.75 0.85 0.95], ...
     'Visible','off');
 y = y - GAP_LABEL_TO_CONTROL;
-slClusterRadius = uislider(cpInner, ...
-    'Limits',[10 100], 'Value',25, ...
+slMergeRadius = uislider(cpInner, ...
+    'Limits',[0 30], 'Value',5, ...
     'Position',[PADDING_PANEL y round(244*sx) 3], ...
-    'MajorTicks',[10 25 50 75 100],'MinorTicks',[], ...
-    'Visible','off');
-y = y - round(58*sy);
-
-lblMinQuality = uilabel(cpInner, ...
-    'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
-    'Text','Corner Quality: 0.010', ...
-    'FontSize',10,'FontColor',[0.75 0.85 0.95], ...
-    'Visible','off');
-y = y - GAP_LABEL_TO_CONTROL;
-slMinQuality = uislider(cpInner, ...
-    'Limits',[0.001 0.05], 'Value',0.01, ...
-    'Position',[PADDING_PANEL y round(244*sx) 3], ...
-    'MajorTicks',[0.001 0.005 0.01 0.02 0.05],'MinorTicks',[], ...
-    'Visible','off');
-y = y - round(58*sy);
-
-lblBlockSize = uilabel(cpInner, ...
-    'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
-    'Text','Block Size: 31 px', ...
-    'FontSize',10,'FontColor',[0.75 0.85 0.95], ...
-    'Visible','off');
-y = y - GAP_LABEL_TO_CONTROL;
-slBlockSize = uislider(cpInner, ...
-    'Limits',[11 41], 'Value',31, ...
-    'Position',[PADDING_PANEL y round(244*sx) 3], ...
-    'MajorTicks',[11 15 21 25 31 35 41],'MinorTicks',[], ...
+    'MajorTicks',[0 5 10 15 20 25 30],'MinorTicks',[], ...
     'Visible','off');
 y = y - round(72*sy);   % leave room for the slider's tick-label numbers
 
@@ -400,12 +374,10 @@ h = struct( ...
     'btnPlay',btnPlay, 'btnPause',btnPause, 'btnStop',btnStop, ...
     'sliderVideo',sliderVideo, 'lblVideoFrame',lblVideoFrame, ...
     'lblFPS',lblFPS, 'btnSave',btnSave, ...
-    'lblPyrLevels',lblPyrLevels,         'slPyrLevels',slPyrLevels, ...
+    'lblNoiseThresh',lblNoiseThresh,     'slNoiseThresh',slNoiseThresh, ...
     'lblMotionThresh',lblMotionThresh,   'slMotionThresh',slMotionThresh, ...
-    'lblMinClusterPts',lblMinClusterPts, 'slMinClusterPts',slMinClusterPts, ...
-    'lblClusterRadius',lblClusterRadius, 'slClusterRadius',slClusterRadius, ...
-    'lblMinQuality',lblMinQuality,       'slMinQuality',slMinQuality, ...
-    'lblBlockSize',lblBlockSize,         'slBlockSize',slBlockSize, ...
+    'lblMinBlobArea',lblMinBlobArea,     'slMinBlobArea',slMinBlobArea, ...
+    'lblMergeRadius',lblMergeRadius,     'slMergeRadius',slMergeRadius, ...
     'btnReset',btnReset, ...
     'chkForceGray',chkForceGray, ...
     'chkHistEq',chkHistEq, ...
@@ -441,7 +413,7 @@ tracking = struct( ...
     'frameIndex',0, ...
     'sceneState',[], ...        % state struct returned by sceneFlow('init'/'update')
     'currentBBoxes',{{}}, ...   % motion-cluster bboxes from the last frame
-    'lastFlow',zeros(0,4), ...  % per-point [oldX oldY newX newY] from the last frame
+    'lastFlow',[], ...          % opticalFlow object returned by estimateFlow last frame
     'initialized',false, ...    % true iff sceneFlow('init') ran on the first frame
     'isPlaying',false, ...
     'timer',[]);
@@ -481,18 +453,14 @@ chkGauss.ValueChangedFcn       = @(~,~) cb_GaussToggle(fig);
 slGaussSigma.ValueChangedFcn   = @(~,~) cb_GaussSigmaReleased(fig);
 chkSobelH.ValueChangedFcn      = @(~,~) applyProc(fig);
 chkSobelV.ValueChangedFcn      = @(~,~) applyProc(fig);
-slPyrLevels.ValueChangingFcn      = @(~,e) cb_PyrLevelsChanging(fig,e);
-slPyrLevels.ValueChangedFcn       = @(~,e) cb_PyrLevelsReleased(fig,e);
+slNoiseThresh.ValueChangingFcn    = @(~,e) cb_NoiseThreshChanging(fig,e);
+slNoiseThresh.ValueChangedFcn     = @(~,e) cb_NoiseThreshReleased(fig,e);
 slMotionThresh.ValueChangingFcn   = @(~,e) cb_MotionThreshChanging(fig,e);
 slMotionThresh.ValueChangedFcn    = @(~,e) cb_MotionThreshReleased(fig,e);
-slMinClusterPts.ValueChangingFcn  = @(~,e) cb_MinClusterChanging(fig,e);
-slMinClusterPts.ValueChangedFcn   = @(~,e) cb_MinClusterReleased(fig,e);
-slClusterRadius.ValueChangingFcn  = @(~,e) cb_ClusterRadiusChanging(fig,e);
-slClusterRadius.ValueChangedFcn   = @(~,e) cb_ClusterRadiusReleased(fig,e);
-slMinQuality.ValueChangingFcn     = @(~,e) cb_MinQualityChanging(fig,e);
-slMinQuality.ValueChangedFcn      = @(~,e) cb_MinQualityReleased(fig,e);
-slBlockSize.ValueChangingFcn      = @(~,e) cb_BlockSizeChanging(fig,e);
-slBlockSize.ValueChangedFcn       = @(~,e) cb_BlockSizeReleased(fig,e);
+slMinBlobArea.ValueChangingFcn    = @(~,e) cb_MinBlobAreaChanging(fig,e);
+slMinBlobArea.ValueChangedFcn     = @(~,e) cb_MinBlobAreaReleased(fig,e);
+slMergeRadius.ValueChangingFcn    = @(~,e) cb_MergeRadiusChanging(fig,e);
+slMergeRadius.ValueChangedFcn     = @(~,e) cb_MergeRadiusReleased(fig,e);
 btnReset.ButtonPushedFcn          = @(~,~) cb_ResetDefaults(fig);
 fig.CloseRequestFcn = @(src,~) cb_CloseApp(src);
 
@@ -571,7 +539,7 @@ function cb_LoadTrackingVideo(fig)
     d.tracking.frameIndex        = 1;
     d.tracking.sceneState        = [];
     d.tracking.currentBBoxes     = {};
-    d.tracking.lastFlow          = zeros(0,4);
+    d.tracking.lastFlow          = [];
     d.tracking.initialized       = false;
     d.tracking.isPlaying         = false;
     fig.UserData = d;
@@ -753,23 +721,17 @@ function cb_ResetDefaults(fig)
     end
 
     % --- Scene-motion sliders -------------------------------------------
-    d.h.slPyrLevels.Value      = 3;
-    d.h.lblPyrLevels.Text      = 'KL Pyramid Levels: 3';
+    d.h.slNoiseThresh.Value    = 0.009;
+    d.h.lblNoiseThresh.Text    = 'LK Noise Threshold: 0.009';
 
     d.h.slMotionThresh.Value   = 1.5;
     d.h.lblMotionThresh.Text   = 'Motion Threshold: 1.5 px';
 
-    d.h.slMinClusterPts.Value  = 5;
-    d.h.lblMinClusterPts.Text  = 'Min Cluster Size: 5 pts';
+    d.h.slMinBlobArea.Value    = 200;
+    d.h.lblMinBlobArea.Text    = 'Min Blob Area: 200 px²';
 
-    d.h.slClusterRadius.Value  = 25;
-    d.h.lblClusterRadius.Text  = 'Cluster Radius: 25 px';
-
-    d.h.slMinQuality.Value     = 0.01;
-    d.h.lblMinQuality.Text     = 'Corner Quality: 0.010';
-
-    d.h.slBlockSize.Value      = 31;
-    d.h.lblBlockSize.Text      = 'Block Size: 31 px';
+    d.h.slMergeRadius.Value    = 5;
+    d.h.lblMergeRadius.Text    = 'Blob Merge Radius: 5 px';
 
     % --- Preprocessing controls -----------------------------------------
     d.h.chkForceGray.Value = false;
@@ -832,19 +794,16 @@ function cb_VideoSeek(fig, seconds)
     cb_PlayTracking(fig);   % always resume on release (auto-play after scrub)
 end
 
-function cb_PyrLevelsChanging(fig, e)
+function cb_NoiseThreshChanging(fig, e)
     d = fig.UserData;
-    d.h.lblPyrLevels.Text = sprintf('KLT Pyramid Levels: %d', round(e.Value));
+    d.h.lblNoiseThresh.Text = sprintf('LK Noise Threshold: %.4f', e.Value);
 end
-
-function cb_PyrLevelsReleased(fig, e)
+function cb_NoiseThreshReleased(fig, e)
     d = fig.UserData;
-    n = max(1, min(5, round(e.Value)));
-    d.h.slPyrLevels.Value = n;
-    d.h.lblPyrLevels.Text = sprintf('KLT Pyramid Levels: %d', n);
-    % NumPyramidLevels is a vision.PointTracker CONSTRUCTOR parameter, so
-    % it only takes effect on the NEXT init - i.e. when a new video is
-    % loaded (or Stop is pressed, which re-inits from the first frame).
+    v = round(e.Value * 10000) / 10000;
+    v = max(0.0001, min(0.05, v));
+    d.h.slNoiseThresh.Value = v;
+    d.h.lblNoiseThresh.Text = sprintf('LK Noise Threshold: %.4f', v);
 end
 
 function cb_MotionThreshChanging(fig, e)
@@ -858,60 +817,26 @@ function cb_MotionThreshReleased(fig, e)
     d.h.lblMotionThresh.Text = sprintf('Motion Threshold: %.1f px', v);
 end
 
-function cb_MinClusterChanging(fig, e)
+function cb_MinBlobAreaChanging(fig, e)
     d = fig.UserData;
-    d.h.lblMinClusterPts.Text = sprintf('Min Cluster Size: %d pts', round(e.Value));
+    d.h.lblMinBlobArea.Text = sprintf('Min Blob Area: %d px²', round(e.Value));
 end
-function cb_MinClusterReleased(fig, e)
+function cb_MinBlobAreaReleased(fig, e)
     d = fig.UserData;
-    n = max(3, min(30, round(e.Value)));
-    d.h.slMinClusterPts.Value = n;
-    d.h.lblMinClusterPts.Text = sprintf('Min Cluster Size: %d pts', n);
-end
-
-function cb_ClusterRadiusChanging(fig, e)
-    d = fig.UserData;
-    d.h.lblClusterRadius.Text = sprintf('Cluster Radius: %d px', round(e.Value));
-end
-function cb_ClusterRadiusReleased(fig, e)
-    d = fig.UserData;
-    r = max(10, min(100, round(e.Value)));
-    d.h.slClusterRadius.Value = r;
-    d.h.lblClusterRadius.Text = sprintf('Cluster Radius: %d px', r);
+    n = max(20, min(5000, round(e.Value)));
+    d.h.slMinBlobArea.Value = n;
+    d.h.lblMinBlobArea.Text = sprintf('Min Blob Area: %d px²', n);
 end
 
-function cb_MinQualityChanging(fig, e)
+function cb_MergeRadiusChanging(fig, e)
     d = fig.UserData;
-    d.h.lblMinQuality.Text = sprintf('Corner Quality: %.3f', e.Value);
+    d.h.lblMergeRadius.Text = sprintf('Blob Merge Radius: %d px', round(e.Value));
 end
-function cb_MinQualityReleased(fig, e)
+function cb_MergeRadiusReleased(fig, e)
     d = fig.UserData;
-    q = round(e.Value * 1000) / 1000;       % 3-decimal snap
-    q = max(0.001, min(0.05, q));
-    d.h.slMinQuality.Value = q;
-    d.h.lblMinQuality.Text = sprintf('Corner Quality: %.3f', q);
-    % Re-detection happens every ~30 frames inside sceneFlow; the new value
-    % takes effect on the next re-detection. Stop/Load Video forces it now.
-end
-
-function cb_BlockSizeChanging(fig, e)
-    d = fig.UserData;
-    d.h.lblBlockSize.Text = sprintf('Block Size: %d px', snapOdd(e.Value));
-end
-function cb_BlockSizeReleased(fig, e)
-    d = fig.UserData;
-    n = snapOdd(e.Value);
-    n = max(11, min(41, n));
-    d.h.slBlockSize.Value = n;
-    d.h.lblBlockSize.Text = sprintf('Block Size: %d px', n);
-    % BlockSize is a vision.PointTracker CONSTRUCTOR parameter, so it only
-    % takes effect on the NEXT init - i.e. when the video is reloaded or
-    % Stop is pressed (which re-inits from the first frame).
-end
-
-function n = snapOdd(v)
-    n = round(v);
-    if mod(n,2) == 0, n = n + 1; end   % force odd
+    n = max(0, min(30, round(e.Value)));
+    d.h.slMergeRadius.Value = n;
+    d.h.lblMergeRadius.Text = sprintf('Blob Merge Radius: %d px', n);
 end
 
 function params = getTrackingParams(fig)
@@ -921,25 +846,18 @@ function params = getTrackingParams(fig)
     params = struct();
     if isvalid(fig)
         d = fig.UserData;
-        if isfield(d.h,'slPyrLevels') && isvalid(d.h.slPyrLevels)
-            params.pyrLevels = max(1, min(5, round(d.h.slPyrLevels.Value)));
+        if isfield(d.h,'slNoiseThresh') && isvalid(d.h.slNoiseThresh)
+            v = round(d.h.slNoiseThresh.Value * 10000) / 10000;
+            params.noiseThresh = max(0.0001, min(0.05, v));
         end
         if isfield(d.h,'slMotionThresh') && isvalid(d.h.slMotionThresh)
             params.motionThresh = round(d.h.slMotionThresh.Value * 10) / 10;
         end
-        if isfield(d.h,'slMinClusterPts') && isvalid(d.h.slMinClusterPts)
-            params.minClusterPts = max(3, min(30, round(d.h.slMinClusterPts.Value)));
+        if isfield(d.h,'slMinBlobArea') && isvalid(d.h.slMinBlobArea)
+            params.minBlobArea = max(20, min(5000, round(d.h.slMinBlobArea.Value)));
         end
-        if isfield(d.h,'slClusterRadius') && isvalid(d.h.slClusterRadius)
-            params.clusterRadius = max(10, min(100, round(d.h.slClusterRadius.Value)));
-        end
-        if isfield(d.h,'slMinQuality') && isvalid(d.h.slMinQuality)
-            q = round(d.h.slMinQuality.Value * 1000) / 1000;
-            params.minQuality = max(0.001, min(0.05, q));
-        end
-        if isfield(d.h,'slBlockSize') && isvalid(d.h.slBlockSize)
-            n = snapOdd(d.h.slBlockSize.Value);
-            params.blockSize = max(11, min(41, n));
+        if isfield(d.h,'slMergeRadius') && isvalid(d.h.slMergeRadius)
+            params.mergeRadius = max(0, min(30, round(d.h.slMergeRadius.Value)));
         end
     end
 end
@@ -1022,7 +940,7 @@ function resetTrackingToFirstFrame(fig)
     d.tracking.frameIndex        = 1;
     d.tracking.sceneState        = [];
     d.tracking.currentBBoxes     = {};
-    d.tracking.lastFlow          = zeros(0,4);
+    d.tracking.lastFlow          = [];
     d.tracking.initialized       = false;
     d.tracking.isPlaying         = false;
     d.tracking.timer             = [];
@@ -1059,18 +977,7 @@ function renderTrackingPreview(fig)
     d.h.lblAxProc.Text = 'Motion Clusters';
 
     imshow(d.tracking.currentFrameInput, 'Parent', d.h.axOrig);
-
-    % Show the corners that were detected on init (no flow yet, no motion).
-    pts = [];
-    if isstruct(d.tracking.sceneState) && isfield(d.tracking.sceneState,'points')
-        pts = d.tracking.sceneState.points;
-    end
-    flowVis = toRGBFrame(d.tracking.currentFrameInput);
-    if ~isempty(pts)
-        flowVis = insertMarker(flowVis, pts, '+', 'Color', [180 180 180], 'Size', 4);
-    end
-    imshow(flowVis, 'Parent', d.h.axFilt);
-
+    imshow(d.tracking.currentFrameInput, 'Parent', d.h.axFilt);
     imshow(d.tracking.currentFrameInput, 'Parent', d.h.axProc);
     d.h.axProc.Title.String = 'Press Play to start tracking';
 end
@@ -1078,11 +985,10 @@ end
 function renderTrackingFrame(fig, frameInput)
 % Per-frame render during Step / Play.
 %   axOrig : the input frame (post-preprocessing)
-%   axFilt : the same frame with per-point optical-flow arrows overlaid;
-%            colored GREEN where the point is moving (flow > motionThresh),
-%            dim GRAY for stationary points. Matches the slides' quiver
-%            visualisation of LK output.
-%   axProc : the input frame with one axis-aligned bbox per motion cluster.
+%   axFilt : the input frame with the dense optical-flow quiver drawn on
+%            top via MATLAB's built-in plot(flow, ...) - the exact
+%            visualisation from the opticalFlowLK documentation page.
+%   axProc : the input frame with one axis-aligned bbox per motion blob.
     d = fig.UserData;
     d.h.lblAxOrig.Text = 'Input Frame';
     d.h.lblAxFilt.Text = 'Optical Flow';
@@ -1090,12 +996,24 @@ function renderTrackingFrame(fig, frameInput)
 
     imshow(frameInput, 'Parent', d.h.axOrig);
 
-    params  = getTrackingParams(fig);
-    if ~isfield(params,'motionThresh'), params.motionThresh = 1.5; end
+    % --- axFilt: docs-style dense flow quiver -------------------------------
+    imshow(frameInput, 'Parent', d.h.axFilt);
+    if ~isempty(d.tracking.lastFlow)
+        hold(d.h.axFilt, 'on');
+        plot(d.tracking.lastFlow, ...
+            'DecimationFactor', [5 5], ...
+            'ScaleFactor',      5, ...
+            'Parent',           d.h.axFilt);
+        hold(d.h.axFilt, 'off');
+        % plot(flow, ...) silently turns axis ticks/labels back on each
+        % frame, which makes MATLAB resize the inner image area to fit
+        % them - the visible "jumping" of the axFilt panel. Force the
+        % axis decorations off after every plot so the image area stays
+        % locked in place.
+        axis(d.h.axFilt, 'off');
+    end
 
-    flowVis = drawFlowOverlay(frameInput, d.tracking.lastFlow, params.motionThresh);
-    imshow(flowVis, 'Parent', d.h.axFilt);
-
+    % --- axProc: input frame + bbox per motion blob -------------------------
     bboxVis = drawClusterBoxes(frameInput, d.tracking.currentBBoxes);
     imshow(bboxVis, 'Parent', d.h.axProc);
 
@@ -1104,62 +1022,6 @@ function renderTrackingFrame(fig, frameInput)
         d.h.axProc.Title.String = 'No Motion Detected';
     else
         d.h.axProc.Title.String = sprintf('Motion Clusters: %d', nClusters);
-    end
-end
-
-function out = drawFlowOverlay(frame, flow, motionThresh)
-% Draw per-point optical-flow vectors as real arrows (line + filled
-% arrowhead). Green for "moving" points (flow magnitude > motionThresh),
-% gray crosses for stationary. flow is Nx4 [oldX oldY newX newY].
-%
-% Display-only amplification: per-frame LK flow is typically 0.5-3 px,
-% which is invisible at native resolution. We scale the arrow length by
-% DISPLAY_AMPLIFY for the overlay only. The underlying tracker, the
-% clustering, and the motion-threshold check all still use the TRUE
-% (un-amplified) flow vectors.
-
-    DISPLAY_AMPLIFY = 5;   % how many times longer the drawn arrow is vs the real flow
-
-    out = toRGBFrame(frame);
-    if isempty(flow), return; end
-
-    disp_ = flow(:,3:4) - flow(:,1:2);
-    mag   = sqrt(sum(disp_.^2, 2));
-    moving = mag > motionThresh;
-
-    % Stationary points: dim gray crosses.
-    if any(~moving)
-        out = insertMarker(out, flow(~moving,3:4), '+', ...
-            'Color', [120 120 120], 'Size', 3);
-    end
-
-    if any(moving)
-        basePts = flow(moving, 1:2);
-        d       = disp_(moving, :);
-        m       = mag(moving);
-        tipPts  = basePts + d * DISPLAY_AMPLIFY;
-
-        % Arrow shafts: line from base to (amplified) tip.
-        shafts = [basePts, tipPts];
-        out = insertShape(out, 'Line', shafts, ...
-            'Color', [0 230 0], 'LineWidth', 1);
-
-        % Arrowheads: small filled triangle at the tip, pointing along the
-        % motion direction. Use the unit-direction vector and its 90-degree
-        % perpendicular to compute the two base corners of the triangle.
-        unitDir = d ./ max(m, eps);
-        perp    = [-unitDir(:,2), unitDir(:,1)];
-        headLen   = 7;   % px, along the shaft
-        headWidth = 3;   % px, sideways
-        b1 = tipPts - unitDir * headLen + perp * headWidth;
-        b2 = tipPts - unitDir * headLen - perp * headWidth;
-
-        % insertShape 'FilledPolygon' takes [x1 y1 x2 y2 x3 y3] per row.
-        tris = [tipPts(:,1) tipPts(:,2) ...
-                b1(:,1)     b1(:,2)     ...
-                b2(:,1)     b2(:,2)];
-        out = insertShape(out, 'FilledPolygon', tris, ...
-            'Color', [0 230 0], 'Opacity', 1.0);
     end
 end
 
@@ -1461,18 +1323,14 @@ function configVisibility(fig)
     d.h.lblVideoFrame.Visible = on_off(strcmp(cat,'Object Tracking'));
     d.h.lblFPS.Visible        = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnSave.Visible       = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblPyrLevels.Visible       = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slPyrLevels.Visible        = on_off(strcmp(cat,'Object Tracking'));
+    d.h.lblNoiseThresh.Visible     = on_off(strcmp(cat,'Object Tracking'));
+    d.h.slNoiseThresh.Visible      = on_off(strcmp(cat,'Object Tracking'));
     d.h.lblMotionThresh.Visible    = on_off(strcmp(cat,'Object Tracking'));
     d.h.slMotionThresh.Visible     = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblMinClusterPts.Visible   = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slMinClusterPts.Visible    = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblClusterRadius.Visible   = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slClusterRadius.Visible    = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblMinQuality.Visible      = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slMinQuality.Visible       = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblBlockSize.Visible       = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slBlockSize.Visible        = on_off(strcmp(cat,'Object Tracking'));
+    d.h.lblMinBlobArea.Visible     = on_off(strcmp(cat,'Object Tracking'));
+    d.h.slMinBlobArea.Visible      = on_off(strcmp(cat,'Object Tracking'));
+    d.h.lblMergeRadius.Visible     = on_off(strcmp(cat,'Object Tracking'));
+    d.h.slMergeRadius.Visible      = on_off(strcmp(cat,'Object Tracking'));
     d.h.btnReset.Visible           = on_off(strcmp(cat,'Object Tracking'));
     noParamOps = {'Epipolar Lines','Structure from Motion','Scene Motion (LK)'};
     showParam = ~ismember(op,noP) && ~strcmp(cat,'Color Space') && ~ismember(op,noParamOps);

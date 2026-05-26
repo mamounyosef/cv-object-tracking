@@ -1,19 +1,18 @@
 function varargout = sceneFlow(mode, varargin)
-% sceneFlow - Whole-frame Lucas-Kanade scene-motion tracker.
+% sceneFlow - Dense Lucas-Kanade scene-motion tracker.
 %
-% No ROI, no per-object identity. The algorithm follows the textbook LK
-% pipeline from the course slides:
+% This is the MATLAB-documentation-style implementation: it uses the
+% built-in opticalFlowLK object and estimateFlow function (the exact
+% functions called out in the course material) to compute dense optical
+% flow at every pixel, then turns moving pixels into bounding boxes via
+% simple connected-component analysis.
 %
-%   1. Detect Harris corners across the ENTIRE frame.
-%   2. Run pyramidal Lucas-Kanade between consecutive frames on every
-%      tracked point (handled by vision.PointTracker).
-%   3. Each point's displacement = its optical-flow vector.
-%   4. Points whose flow magnitude exceeds motionThresh are "moving".
-%   5. Cluster moving points spatially (DBSCAN). Each cluster's axis-
-%      aligned bounding box marks an "object in motion".
-%
-% Periodic re-detection tops up the point pool so that newly-appearing
-% objects (e.g. a ball emerging from behind an obstacle) get covered.
+% Pipeline:
+%   1. estimateFlow(opticalFlowLK, frame)  -> flow.Vx, flow.Vy per pixel
+%   2. magnitude = sqrt(Vx^2 + Vy^2)
+%   3. mask = magnitude > motionThresh
+%   4. mask = bwareaopen(mask, minBlobArea)        % drop tiny noise blobs
+%   5. regionprops(mask, 'BoundingBox')            % one bbox per blob
 %
 % See TRACKER_CONTRACT.md for the calling convention.
 
@@ -26,20 +25,16 @@ function varargout = sceneFlow(mode, varargin)
             end
             P = applyDefaults(params);
 
-            gray   = toGray(frame);
-            points = detectCorners(gray, P);
+            % Create the LK optical-flow object exactly as the docs show.
+            opticFlow = opticalFlowLK('NoiseThreshold', P.noiseThresh);
 
-            tracker = vision.PointTracker( ...
-                'MaxBidirectionalError', inf, ...
-                'BlockSize',             [P.blockSize P.blockSize], ...
-                'NumPyramidLevels',      P.pyrLevels);
-            initialize(tracker, points, gray);
+            % Prime it with the first frame so the next estimateFlow call
+            % has a previous frame to compare against. (Without this, the
+            % first real call returns zero flow.)
+            gray = toGray(frame);
+            estimateFlow(opticFlow, gray); %#ok<NASGU>
 
-            state = struct( ...
-                'tracker',           tracker, ...
-                'points',            points, ...     % Nx2 current positions
-                'framesSinceDetect', 0);
-
+            state = struct('opticFlow', opticFlow, 'noiseThresh', P.noiseThresh);
             varargout = {state};
 
         case 'update'
@@ -51,66 +46,41 @@ function varargout = sceneFlow(mode, varargin)
             end
             P = applyDefaults(params);
 
+            % If NoiseThreshold changed in the GUI, rebuild the LK object
+            % (it's a constructor-only parameter on opticalFlowLK).
+            if abs(state.noiseThresh - P.noiseThresh) > 1e-9
+                state.opticFlow = opticalFlowLK('NoiseThreshold', P.noiseThresh);
+                state.noiseThresh = P.noiseThresh;
+                % Prime once more so we don't get an empty first flow.
+                estimateFlow(state.opticFlow, toGray(frame)); %#ok<NASGU>
+            end
+
             gray = toGray(frame);
+            flow = estimateFlow(state.opticFlow, gray);
 
-            % --- 1. Step LK on every tracked point -----------------------
-            [newPts, isFound] = step(state.tracker, gray);
-            oldValid = state.points(isFound, :);
-            newValid = newPts(isFound, :);
-
-            % --- 2. Per-point flow vectors -------------------------------
-            % flow is Nx4: [oldX oldY newX newY]; used by the GUI to draw
-            % the quiver overlay on axFilt.
-            if isempty(newValid)
-                flow = zeros(0, 4);
-            else
-                flow = [oldValid newValid];
+            % --- Build moving-pixel mask + bboxes -----------------------
+            mag  = sqrt(flow.Vx.^2 + flow.Vy.^2);
+            mask = mag > P.motionThresh;
+            if P.minBlobArea > 0
+                mask = bwareaopen(mask, P.minBlobArea);
             end
 
-            % --- 3. Filter to MOVING points ------------------------------
-            bboxes = {};
-            if ~isempty(newValid)
-                disp_ = newValid - oldValid;
-                mag   = sqrt(sum(disp_.^2, 2));
-                moving = mag > P.motionThresh;
-                movingPts = newValid(moving, :);
-
-                % --- 4. Cluster moving points (DBSCAN) ------------------
-                if size(movingPts, 1) >= P.minClusterPts
-                    labels = dbscan(movingPts, P.clusterRadius, P.minClusterPts);
-                    ids = unique(labels);
-                    ids = ids(ids > 0);   % drop noise (-1)
-                    for ii = 1:numel(ids)
-                        pts = movingPts(labels == ids(ii), :);
-                        x1 = min(pts(:,1)); x2 = max(pts(:,1));
-                        y1 = min(pts(:,2)); y2 = max(pts(:,2));
-                        bboxes{end+1} = [x1, y1, x2-x1+1, y2-y1+1]; %#ok<AGROW>
-                    end
-                end
+            % Optional dilation to merge near-but-non-touching fragments
+            % into a single blob. mergeRadius pixels of dilation = two
+            % blobs up to 2 * mergeRadius apart will become connected.
+            if P.mergeRadius > 0
+                mask = imdilate(mask, strel('disk', P.mergeRadius));
             end
 
-            % --- 5. Persist points & periodic re-detection ---------------
-            % Keep all surviving tracked points in the tracker.
-            if ~isempty(newValid)
-                setPoints(state.tracker, newValid);
-                state.points = newValid;
-            end
-            state.framesSinceDetect = state.framesSinceDetect + 1;
-
-            % Re-detect when point count drops or after redetectEvery frames.
-            % New corners are merged with existing tracks; a minimum-
-            % separation check stops the same corner being tracked twice.
-            if size(state.points, 1) < P.minPoints || ...
-                    state.framesSinceDetect >= P.redetectEvery
-                newCorners = detectCorners(gray, P);
-                merged = mergePoints(state.points, newCorners, P);
-                if ~isempty(merged)
-                    setPoints(state.tracker, merged);
-                    state.points = merged;
-                end
-                state.framesSinceDetect = 0;
+            stats = regionprops(mask, 'BoundingBox');
+            bboxes = cell(1, numel(stats));
+            for i = 1:numel(stats)
+                bboxes{i} = stats(i).BoundingBox;
             end
 
+            % The third return value is the opticalFlow OBJECT itself, so
+            % the GUI can hand it to MATLAB's built-in plot(flow, ...) for
+            % the quiver visualisation on axFilt.
             varargout = {state, bboxes, flow};
 
         otherwise
@@ -124,17 +94,10 @@ end
 % ============================================================================
 
 function P = applyDefaults(P)
-    if ~isfield(P,'motionThresh'),  P.motionThresh   = 1.5;   end
-    if ~isfield(P,'minClusterPts'), P.minClusterPts  = 5;     end
-    if ~isfield(P,'clusterRadius'), P.clusterRadius  = 25;    end
-    if ~isfield(P,'pyrLevels'),     P.pyrLevels      = 3;     end
-    if ~isfield(P,'minPoints'),     P.minPoints      = 50;    end
-    if ~isfield(P,'maxPoints'),     P.maxPoints      = 600;   end
-    if ~isfield(P,'minQuality'),    P.minQuality     = 0.01;  end
-    if ~isfield(P,'blockSize'),     P.blockSize      = 31;    end
-    if ~isfield(P,'redetectEvery'), P.redetectEvery  = 30;    end
-    if ~isfield(P,'minSeparation'), P.minSeparation  = 5;     end  % px
-    if mod(P.blockSize,2) == 0, P.blockSize = P.blockSize + 1; end
+    if ~isfield(P,'noiseThresh'),  P.noiseThresh   = 0.009;  end
+    if ~isfield(P,'motionThresh'), P.motionThresh  = 1.5;    end
+    if ~isfield(P,'minBlobArea'),  P.minBlobArea   = 200;    end
+    if ~isfield(P,'mergeRadius'),  P.mergeRadius   = 5;      end
 end
 
 function g = toGray(frame)
@@ -142,42 +105,5 @@ function g = toGray(frame)
         g = rgb2gray(frame);
     else
         g = frame;
-    end
-end
-
-function pts = detectCorners(gray, P)
-% Harris corners over the WHOLE frame (no ROI). Capped at maxPoints.
-% Uses MATLAB's detectHarrisFeatures, which implements the cornerness
-% measure R = det(M) - k*trace(M)^2 on the second-moment matrix from
-% the course slides.
-    f = detectHarrisFeatures(gray, 'MinQuality', P.minQuality);
-    if f.Count > P.maxPoints
-        f = selectStrongest(f, P.maxPoints);
-    end
-    pts = f.Location;
-end
-
-function out = mergePoints(existing, newPts, P)
-% Add newPts to existing, skipping any new point within minSeparation of
-% an existing one. Caps the total at maxPoints (drops weakest = newest
-% extras first).
-    if isempty(existing)
-        out = newPts;
-    elseif isempty(newPts)
-        out = existing;
-    else
-        keep = true(size(newPts, 1), 1);
-        sep2 = P.minSeparation^2;
-        for i = 1:size(newPts, 1)
-            d2 = (existing(:,1) - newPts(i,1)).^2 + ...
-                 (existing(:,2) - newPts(i,2)).^2;
-            if any(d2 < sep2)
-                keep(i) = false;
-            end
-        end
-        out = [existing; newPts(keep, :)];
-    end
-    if size(out, 1) > P.maxPoints
-        out = out(1:P.maxPoints, :);
     end
 end
