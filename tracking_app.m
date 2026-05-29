@@ -123,6 +123,15 @@ btnStop = uibutton(cpInner,'push', ...
     'Visible','off');
 y = y - round(40*sy);
 
+% --- Mean-Shift ROI button (only visible for the Mean-Shift operation) --
+btnMeanShiftROI = uibutton(cpInner,'push', ...
+    'Text','▭ Select Object ROI', ...
+    'Position',[PADDING_PANEL y round(244*sx) BTN_HEIGHT], ...
+    'BackgroundColor',[0.78 0.52 0.18], ...
+    'FontColor',[1 1 1],'FontWeight','bold','FontSize',12, ...
+    'Visible','off');
+y = y - round(40*sy);
+
 % --- Save Frame button (stays in Controls panel) -----------------------
 btnSave = uibutton(cpInner,'push', ...
     'Text','💾 Save Frame', ...
@@ -311,6 +320,21 @@ chkSobelV = uicheckbox(cpInner, ...
     'Text','Sobel V (preprocess)', ...
     'Position',[PADDING_PANEL y round(244*sx) round(22*sy)], ...
     'FontColor',[0.9 0.9 0.9],'FontSize',11,'Value',false);
+y = y - round(26*sy);
+
+chkPyrReduce = uicheckbox(cpInner, ...
+    'Text','Gaussian Pyramid Reduce', ...
+    'Position',[PADDING_PANEL y round(244*sx) round(22*sy)], ...
+    'FontColor',[0.9 0.9 0.9],'FontSize',11,'Value',false);
+y = y - round(26*sy);
+
+lblPyrReduce = uilabel(cpInner,'Position',[PADDING_PANEL y round(244*sx) LABEL_HEIGHT], ...
+    'Text','Reduce Levels: 1', ...
+    'FontSize',10,'FontColor',[0.75 0.85 0.75],'Visible','off');
+y = y - GAP_LABEL_TO_CONTROL;
+slPyrReduce = uislider(cpInner,'Limits',[1 4],'Value',1, ...
+    'Position',[PADDING_PANEL y round(244*sx) 3], ...
+    'MajorTicks',[1 2 3 4],'MinorTicks',[],'Visible','off');
 
 %% ── Image axes (top strip) ───────────────────────────────────────────────
 % Heights chosen so axes sit above kp (top=328 at sy=1) AND axis labels fit
@@ -373,7 +397,7 @@ h = struct( ...
     'btnStep',btnStep, ...
     'btnPlay',btnPlay, 'btnPause',btnPause, 'btnStop',btnStop, ...
     'sliderVideo',sliderVideo, 'lblVideoFrame',lblVideoFrame, ...
-    'lblFPS',lblFPS, 'btnSave',btnSave, ...
+    'lblFPS',lblFPS, 'btnSave',btnSave, 'btnMeanShiftROI',btnMeanShiftROI, ...
     'lblNoiseThresh',lblNoiseThresh,     'slNoiseThresh',slNoiseThresh, ...
     'lblMotionThresh',lblMotionThresh,   'slMotionThresh',slMotionThresh, ...
     'lblMinBlobArea',lblMinBlobArea,     'slMinBlobArea',slMinBlobArea, ...
@@ -383,7 +407,9 @@ h = struct( ...
     'chkHistEq',chkHistEq, ...
     'chkBoxFilt',chkBoxFilt, 'lblBoxSize',lblBoxSize, 'slBoxSize',slBoxSize, ...
     'chkGauss',chkGauss, 'lblGaussSigma',lblGaussSigma, 'slGaussSigma',slGaussSigma, ...
-    'chkSobelH',chkSobelH, 'chkSobelV',chkSobelV, 'lblPreprocHeader',lblPreprocHeader, ...
+    'chkSobelH',chkSobelH, 'chkSobelV',chkSobelV, ...
+    'chkPyrReduce',chkPyrReduce, 'lblPyrReduce',lblPyrReduce, 'slPyrReduce',slPyrReduce, ...
+    'lblPreprocHeader',lblPreprocHeader, ...
     'axOrig',axOrig, 'lblAxOrig',lblAxOrig, ...
     'axFilt',axFilt, 'lblAxFilt',lblAxFilt, ...
     'axProc',axProc, 'lblAxProc',lblAxProc, ...
@@ -394,7 +420,8 @@ h = struct( ...
 % (used when Butterworth sliders show/hide so the gap collapses).
 h.preprocCtrls = {lblPreprocHeader, chkForceGray, chkHistEq, chkBoxFilt, ...
                   lblBoxSize, slBoxSize, chkGauss, lblGaussSigma, slGaussSigma, ...
-                  chkSobelH, chkSobelV};
+                  chkSobelH, chkSobelV, ...
+                  chkPyrReduce, lblPyrReduce, slPyrReduce};
 h.preprocBaseY = zeros(1, numel(h.preprocCtrls));
 for ii = 1:numel(h.preprocCtrls)
     h.preprocBaseY(ii) = h.preprocCtrls{ii}.Position(2);
@@ -415,6 +442,10 @@ tracking = struct( ...
     'currentBBoxes',{{}}, ...   % motion-cluster bboxes from the last frame
     'lastFlow',[], ...          % opticalFlow object returned by estimateFlow last frame
     'initialized',false, ...    % true iff sceneFlow('init') ran on the first frame
+    'msState',[], ...           % mean-shift tracker state (separate operation)
+    'msBBox',[], ...            % current mean-shift bbox [x y w h]
+    'msBackProj',[], ...        % last mean-shift back-projection image (for axFilt)
+    'msInitialized',false, ...  % true iff a mean-shift ROI has been selected
     'isPlaying',false, ...
     'timer',[]);
 fig.UserData = struct('h',h, 'origImg',[], 'procImg',[], 'templateImg',[], ...
@@ -428,6 +459,7 @@ btnPlay.ButtonPushedFcn     = @(~,~) cb_PlayTracking(fig);
 btnPause.ButtonPushedFcn    = @(~,~) cb_PauseTracking(fig);
 btnStop.ButtonPushedFcn     = @(~,~) cb_StopTracking(fig);
 btnSave.ButtonPushedFcn     = @(~,~) saveButton(fig);
+btnMeanShiftROI.ButtonPushedFcn = @(~,~) cb_SelectMeanShiftROI(fig);
 % Slider needs BOTH handlers so it doesn't fight the playback timer:
 %   ValueChangingFcn  - fires the moment the user grabs the slider; pauses
 %                       the timer so it stops overwriting sliderVideo.Value
@@ -453,6 +485,8 @@ chkGauss.ValueChangedFcn       = @(~,~) cb_GaussToggle(fig);
 slGaussSigma.ValueChangedFcn   = @(~,~) cb_GaussSigmaReleased(fig);
 chkSobelH.ValueChangedFcn      = @(~,~) applyProc(fig);
 chkSobelV.ValueChangedFcn      = @(~,~) applyProc(fig);
+chkPyrReduce.ValueChangedFcn   = @(~,~) cb_PyrReduceToggle(fig);
+slPyrReduce.ValueChangedFcn    = @(~,~) cb_PyrReduceLevelReleased(fig);
 slNoiseThresh.ValueChangingFcn    = @(~,e) cb_NoiseThreshChanging(fig,e);
 slNoiseThresh.ValueChangedFcn     = @(~,e) cb_NoiseThreshReleased(fig,e);
 slMotionThresh.ValueChangingFcn   = @(~,e) cb_MotionThreshChanging(fig,e);
@@ -541,6 +575,10 @@ function cb_LoadTrackingVideo(fig)
     d.tracking.currentBBoxes     = {};
     d.tracking.lastFlow          = [];
     d.tracking.initialized       = false;
+    d.tracking.msState           = [];
+    d.tracking.msBBox            = [];
+    d.tracking.msBackProj        = [];
+    d.tracking.msInitialized     = false;
     d.tracking.isPlaying         = false;
     fig.UserData = d;
 
@@ -643,6 +681,61 @@ function cb_StopTracking(fig)
     resetTrackingToFirstFrame(fig);
 end
 
+function cb_SelectMeanShiftROI(fig)
+    d = fig.UserData;
+    if ~strcmp(d.h.ddCat.Value,'Object Tracking') || ...
+            ~strcmp(d.h.ddOp.Value,'Mean-Shift')
+        return;
+    end
+    if isempty(d.tracking.currentFrameInput)
+        uialert(fig, 'Load a video before selecting an object ROI.', 'Mean-Shift');
+        return;
+    end
+
+    % Pause playback while the user draws the box.
+    stopTrackingTimer(fig);
+
+    % Show the current frame and let the user drag a rectangle on it.
+    imshow(d.tracking.currentFrameInput, 'Parent', d.h.axOrig);
+    try
+        roi = drawrectangle(d.h.axOrig);
+        if ~isvalid(roi) || isempty(roi.Position) || ...
+                roi.Position(3) < 1 || roi.Position(4) < 1
+            if isvalid(roi), delete(roi); end
+            return;
+        end
+        bbox = roi.Position;   % [x y w h]
+        delete(roi);
+    catch err
+        uialert(fig, sprintf('Could not select the ROI.\n\n%s', err.message), ...
+            'Mean-Shift ROI Failed');
+        return;
+    end
+
+    if bbox(3) < 5 || bbox(4) < 5
+        uialert(fig, 'Draw an ROI at least 5x5 pixels.', 'Mean-Shift');
+        return;
+    end
+
+    % Initialize the mean-shift tracker from the selected region.
+    d = fig.UserData;
+    try
+        ensureSceneFlowOnPath();   % also puts trackers/ (meanShift.m) on path
+        d.tracking.msState = meanShift('init', d.tracking.currentFrameInput, ...
+            bbox, getTrackingParams(fig));
+        d.tracking.msBBox  = bbox;
+        d.tracking.msInitialized = true;
+        d.tracking.msBackProj = [];
+        fig.UserData = d;
+    catch err
+        uialert(fig, sprintf('Could not initialize mean-shift.\n\n%s', err.message), ...
+            'Mean-Shift Init Failed');
+        return;
+    end
+
+    renderTrackingFrame(fig, d.tracking.currentFrameInput);
+end
+
 function trackingStep(fig)
     if ~isvalid(fig), return; end
     d = fig.UserData;
@@ -679,27 +772,59 @@ function trackingStep(fig)
 
     frameInput = preProcess(frameRaw, d.h);
     params = getTrackingParams(fig);
+    op = d.h.ddOp.Value;
 
     ensureSceneFlowOnPath();
-    try
-        [sceneState, bboxes, flow] = sceneFlow('update', frameInput, ...
-            d.tracking.sceneState, params);
-    catch err
-        stopTrackingTimer(fig);
-        uialert(fig, sprintf('Scene-flow update failed.\n\n%s', err.message), ...
-            'Tracking Step Failed');
-        return;
+    if strcmp(op, 'Mean-Shift')
+        % --- Mean-Shift branch -----------------------------------------
+        if ~d.tracking.msInitialized || isempty(d.tracking.msState)
+            % No ROI selected yet: advance the frame but don't track.
+            d.tracking.frameIndex        = d.tracking.frameIndex + 1;
+            d.tracking.currentFrameRaw   = frameRaw;
+            d.tracking.currentFrameInput = frameInput;
+            fig.UserData = d;
+            renderTrackingFrame(fig, frameInput);
+        else
+            try
+                [msState, msBBox, backProj] = meanShift('update', frameInput, ...
+                    d.tracking.msState, params);
+            catch err
+                stopTrackingTimer(fig);
+                uialert(fig, sprintf('Mean-shift update failed.\n\n%s', err.message), ...
+                    'Tracking Step Failed');
+                return;
+            end
+            d.tracking.msState           = msState;
+            d.tracking.msBBox            = msBBox;
+            d.tracking.msBackProj        = backProj;
+            d.tracking.frameIndex        = d.tracking.frameIndex + 1;
+            d.tracking.currentFrameRaw   = frameRaw;
+            d.tracking.currentFrameInput = frameInput;
+            fig.UserData = d;
+            renderTrackingFrame(fig, frameInput);
+        end
+    else
+        % --- Scene Motion (LK) branch ----------------------------------
+        try
+            [sceneState, bboxes, flow] = sceneFlow('update', frameInput, ...
+                d.tracking.sceneState, params);
+        catch err
+            stopTrackingTimer(fig);
+            uialert(fig, sprintf('Scene-flow update failed.\n\n%s', err.message), ...
+                'Tracking Step Failed');
+            return;
+        end
+
+        d.tracking.sceneState        = sceneState;
+        d.tracking.currentBBoxes     = bboxes;
+        d.tracking.lastFlow          = flow;
+        d.tracking.frameIndex        = d.tracking.frameIndex + 1;
+        d.tracking.currentFrameRaw   = frameRaw;
+        d.tracking.currentFrameInput = frameInput;
+        fig.UserData = d;
+
+        renderTrackingFrame(fig, frameInput);
     end
-
-    d.tracking.sceneState        = sceneState;
-    d.tracking.currentBBoxes     = bboxes;
-    d.tracking.lastFlow          = flow;
-    d.tracking.frameIndex        = d.tracking.frameIndex + 1;
-    d.tracking.currentFrameRaw   = frameRaw;
-    d.tracking.currentFrameInput = frameInput;
-    fig.UserData = d;
-
-    renderTrackingFrame(fig, frameInput);
 
     % Whole-step elapsed time = honest "how fast can we process one frame"
     % metric. Includes frame read + preprocess + LK + cluster + render.
@@ -740,6 +865,11 @@ function cb_ResetDefaults(fig)
     d.h.chkGauss.Value     = false;
     d.h.chkSobelH.Value    = false;
     d.h.chkSobelV.Value    = false;
+    d.h.chkPyrReduce.Value = false;
+    d.h.slPyrReduce.Value  = 1;
+    d.h.lblPyrReduce.Text  = 'Reduce Levels: 1';
+    d.h.lblPyrReduce.Visible = 'off';
+    d.h.slPyrReduce.Visible  = 'off';
     d.h.slBoxSize.Value    = 3;
     d.h.lblBoxSize.Text    = 'Kernel: 3x3';
     d.h.slGaussSigma.Value = 1.0;
@@ -942,6 +1072,10 @@ function resetTrackingToFirstFrame(fig)
     d.tracking.currentBBoxes     = {};
     d.tracking.lastFlow          = [];
     d.tracking.initialized       = false;
+    d.tracking.msState           = [];
+    d.tracking.msBBox            = [];
+    d.tracking.msBackProj        = [];
+    d.tracking.msInitialized     = false;
     d.tracking.isPlaying         = false;
     d.tracking.timer             = [];
     fig.UserData = d;
@@ -973,13 +1107,20 @@ function renderTrackingPreview(fig)
     if isempty(d.tracking.currentFrameInput), return; end
 
     d.h.lblAxOrig.Text = 'Input Frame';
-    d.h.lblAxFilt.Text = 'Optical Flow';
-    d.h.lblAxProc.Text = 'Motion Clusters';
+    if strcmp(d.h.ddOp.Value,'Mean-Shift')
+        d.h.lblAxFilt.Text = 'Back-Projection';
+        d.h.lblAxProc.Text = 'Tracked Object';
+        hint = 'Select Object ROI, then Play';
+    else
+        d.h.lblAxFilt.Text = 'Optical Flow';
+        d.h.lblAxProc.Text = 'Motion Clusters';
+        hint = 'Press Play to start tracking';
+    end
 
     imshow(d.tracking.currentFrameInput, 'Parent', d.h.axOrig);
     imshow(d.tracking.currentFrameInput, 'Parent', d.h.axFilt);
     imshow(d.tracking.currentFrameInput, 'Parent', d.h.axProc);
-    d.h.axProc.Title.String = 'Press Play to start tracking';
+    d.h.axProc.Title.String = hint;
 end
 
 function renderTrackingFrame(fig, frameInput)
@@ -990,13 +1131,43 @@ function renderTrackingFrame(fig, frameInput)
 %            visualisation from the opticalFlowLK documentation page.
 %   axProc : the input frame with one axis-aligned bbox per motion blob.
     d = fig.UserData;
+    imshow(frameInput, 'Parent', d.h.axOrig);
     d.h.lblAxOrig.Text = 'Input Frame';
+
+    if strcmp(d.h.ddOp.Value, 'Mean-Shift')
+        % --- Mean-Shift visualisation ----------------------------------
+        %   axFilt : the colour back-projection (bright = matches target)
+        %   axProc : input frame with the tracked bbox drawn on it
+        d.h.lblAxFilt.Text = 'Back-Projection';
+        d.h.lblAxProc.Text = 'Tracked Object';
+
+        bp = d.tracking.msBackProj;
+        if isempty(bp)
+            imshow(frameInput, 'Parent', d.h.axFilt);
+        else
+            imshow(mat2gray(bp), 'Parent', d.h.axFilt);
+        end
+
+        procVis = toRGBFrame(frameInput);
+        if ~isempty(d.tracking.msBBox)
+            procVis = insertShape(procVis, 'Rectangle', d.tracking.msBBox, ...
+                'Color', [255 230 0], 'LineWidth', 3);
+        end
+        imshow(procVis, 'Parent', d.h.axProc);
+        if d.tracking.msInitialized
+            d.h.axProc.Title.String = 'Tracked Object';
+        else
+            d.h.axProc.Title.String = 'Select Object ROI to start';
+        end
+        return;
+    end
+
+    % --- Scene Motion (LK) visualisation -------------------------------
     d.h.lblAxFilt.Text = 'Optical Flow';
     d.h.lblAxProc.Text = 'Motion Clusters';
 
-    imshow(frameInput, 'Parent', d.h.axOrig);
-
     % --- axFilt: docs-style dense flow quiver -------------------------------
+    [Hf, Wf, ~] = size(frameInput);
     imshow(frameInput, 'Parent', d.h.axFilt);
     if ~isempty(d.tracking.lastFlow)
         hold(d.h.axFilt, 'on');
@@ -1005,13 +1176,23 @@ function renderTrackingFrame(fig, frameInput)
             'ScaleFactor',      5, ...
             'Parent',           d.h.axFilt);
         hold(d.h.axFilt, 'off');
-        % plot(flow, ...) silently turns axis ticks/labels back on each
-        % frame, which makes MATLAB resize the inner image area to fit
-        % them - the visible "jumping" of the axFilt panel. Force the
-        % axis decorations off after every plot so the image area stays
-        % locked in place.
-        axis(d.h.axFilt, 'off');
     end
+    % plot(flow, ...) calls quiver internally, which silently re-enables
+    % tick labels and toggles XLim/YLim/aspect modes. On uiaxes that
+    % triggers a recomputation of the inner drawing area, which makes the
+    % axFilt panel visibly jump every frame. Pin everything down by hand
+    % so the visible image rectangle stays locked in place:
+    d.h.axFilt.XLim                  = [0.5, Wf + 0.5];
+    d.h.axFilt.YLim                  = [0.5, Hf + 0.5];
+    d.h.axFilt.XLimMode              = 'manual';
+    d.h.axFilt.YLimMode              = 'manual';
+    d.h.axFilt.DataAspectRatio       = [1 1 1];
+    d.h.axFilt.DataAspectRatioMode   = 'manual';
+    d.h.axFilt.PlotBoxAspectRatioMode = 'manual';
+    d.h.axFilt.XTick                 = [];
+    d.h.axFilt.YTick                 = [];
+    d.h.axFilt.Visible               = 'on';   % keep the panel border visible
+    d.h.axFilt.YDir                  = 'reverse';   % image-coords (origin at top)
 
     % --- axProc: input frame + bbox per motion blob -------------------------
     bboxVis = drawClusterBoxes(frameInput, d.tracking.currentBBoxes);
@@ -1134,7 +1315,7 @@ function cb_CatChanged(fig)
         case 'Stereo Vision'
             d.h.ddOp.Items = {'Epipolar Lines','Disparity Map','Scanline Matching','Structure from Motion'};
         case 'Object Tracking'
-            d.h.ddOp.Items = {'Scene Motion (LK)'};
+            d.h.ddOp.Items = {'Scene Motion (LK)','Mean-Shift'};
     end
     fig.UserData = d;
     configSlider(fig);
@@ -1143,6 +1324,17 @@ function cb_CatChanged(fig)
 end
 
 function cb_OpChanged(fig)
+    % Switching tracking operation: stop playback and clear the mean-shift
+    % ROI so a stale target doesn't carry across operations.
+    if strcmp(fig.UserData.h.ddCat.Value,'Object Tracking')
+        stopTrackingTimer(fig);
+        d = fig.UserData;
+        d.tracking.msState       = [];
+        d.tracking.msBBox        = [];
+        d.tracking.msBackProj    = [];
+        d.tracking.msInitialized = false;
+        fig.UserData = d;
+    end
     configSlider(fig);
     configVisibility(fig);
     applyProc(fig);
@@ -1223,6 +1415,25 @@ function cb_GaussSigmaReleased(fig)
     d = fig.UserData;
     sig = d.h.slGaussSigma.Value;
     d.h.lblGaussSigma.Text = sprintf('Sigma: %.1f', sig);
+    fig.UserData = d;
+    applyProc(fig);
+end
+
+function cb_PyrReduceToggle(fig)
+    d = fig.UserData;
+    on = d.h.chkPyrReduce.Value;
+    d.h.lblPyrReduce.Visible = ternary(on,'on','off');
+    d.h.slPyrReduce.Visible  = ternary(on,'on','off');
+    fig.UserData = d;
+    relayoutPreproc(fig);
+    applyProc(fig);
+end
+
+function cb_PyrReduceLevelReleased(fig)
+    d = fig.UserData;
+    n = max(1, min(4, round(d.h.slPyrReduce.Value)));
+    d.h.slPyrReduce.Value = n;
+    d.h.lblPyrReduce.Text = sprintf('Reduce Levels: %d', n);
     fig.UserData = d;
     applyProc(fig);
 end
@@ -1315,23 +1526,33 @@ function configVisibility(fig)
     d.h.kp.Visible       = on_off(~ismember(cat, newCats));
     d.h.btnLoad.Text = ternary(strcmp(cat,'Object Tracking'),'  Load Video','  Load Image');
     d.h.btnTemplate.Visible = on_off(strcmp(cat,'Template Matching') || strcmp(cat,'Stereo Vision'));
-    d.h.btnStep.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.btnPlay.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.btnPause.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.btnStop.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.sliderVideo.Visible   = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblVideoFrame.Visible = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblFPS.Visible        = on_off(strcmp(cat,'Object Tracking'));
-    d.h.btnSave.Visible       = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblNoiseThresh.Visible     = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slNoiseThresh.Visible      = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblMotionThresh.Visible    = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slMotionThresh.Visible     = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblMinBlobArea.Visible     = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slMinBlobArea.Visible      = on_off(strcmp(cat,'Object Tracking'));
-    d.h.lblMergeRadius.Visible     = on_off(strcmp(cat,'Object Tracking'));
-    d.h.slMergeRadius.Visible      = on_off(strcmp(cat,'Object Tracking'));
-    d.h.btnReset.Visible           = on_off(strcmp(cat,'Object Tracking'));
+    isTrack = strcmp(cat,'Object Tracking');
+    isLK    = isTrack && strcmp(op,'Scene Motion (LK)');
+    isMS    = isTrack && strcmp(op,'Mean-Shift');
+
+    % Shared playback controls (both tracking operations)
+    d.h.btnStep.Visible = on_off(isTrack);
+    d.h.btnPlay.Visible = on_off(isTrack);
+    d.h.btnPause.Visible = on_off(isTrack);
+    d.h.btnStop.Visible = on_off(isTrack);
+    d.h.sliderVideo.Visible   = on_off(isTrack);
+    d.h.lblVideoFrame.Visible = on_off(isTrack);
+    d.h.lblFPS.Visible        = on_off(isTrack);
+    d.h.btnSave.Visible       = on_off(isTrack);
+    d.h.btnReset.Visible      = on_off(isTrack);
+
+    % LK-only sliders (dense optical flow + clustering parameters)
+    d.h.lblNoiseThresh.Visible     = on_off(isLK);
+    d.h.slNoiseThresh.Visible      = on_off(isLK);
+    d.h.lblMotionThresh.Visible    = on_off(isLK);
+    d.h.slMotionThresh.Visible     = on_off(isLK);
+    d.h.lblMinBlobArea.Visible     = on_off(isLK);
+    d.h.slMinBlobArea.Visible      = on_off(isLK);
+    d.h.lblMergeRadius.Visible     = on_off(isLK);
+    d.h.slMergeRadius.Visible      = on_off(isLK);
+
+    % Mean-Shift-only control (object ROI selection)
+    d.h.btnMeanShiftROI.Visible    = on_off(isMS);
     noParamOps = {'Epipolar Lines','Structure from Motion','Scene Motion (LK)'};
     showParam = ~ismember(op,noP) && ~strcmp(cat,'Color Space') && ~ismember(op,noParamOps);
     d.h.slParam.Visible  = on_off(showParam);
@@ -1379,7 +1600,13 @@ function relayoutPreproc(fig)
     end
 
     setY(d.h.chkSobelH, y);  y = y - round(26*sy);
-    setY(d.h.chkSobelV, y);
+    setY(d.h.chkSobelV, y);  y = y - round(26*sy);
+
+    setY(d.h.chkPyrReduce, y);  y = y - round(26*sy);
+    if d.h.chkPyrReduce.Value
+        setY(d.h.lblPyrReduce, y);  y = y - GAP_LBL;
+        setY(d.h.slPyrReduce,  y);  %#ok<NASGU>
+    end
 end
 
 function updateParamLbl(lbl,op,val)
@@ -1495,7 +1722,7 @@ threeAxes = {'Laplacian 1st','Laplacian 2nd','Boosting', ...
              'Gabor Bank', ...
              'Sobel (edge)','Prewitt (edge)','Roberts', ...
              'Epipolar Lines','Disparity Map','Structure from Motion', ...
-             'Scene Motion (LK)', ...
+             'Scene Motion (LK)','Mean-Shift', ...
              };
 showFilt = ismember(op,threeAxes);
 d.h.axFilt.Visible    = ternary(showFilt,'on','off');
@@ -1593,15 +1820,19 @@ fig.UserData = d;
         % on the next trackingStep (preProcess runs every frame).
         if ~isempty(d.tracking.currentFrameRaw) && d.tracking.frameIndex <= 1
             d.tracking.currentFrameInput = preProcess(d.tracking.currentFrameRaw, d.h);
-            try
-                ensureSceneFlowOnPath();
-                d.tracking.sceneState  = sceneFlow('init', ...
-                    d.tracking.currentFrameInput, getTrackingParams(fig));
-                d.tracking.initialized = true;
-            catch
-                % If the user's preprocessing produced a degenerate frame,
-                % silently leave the previous state in place rather than
-                % popping an alert from a passive UI callback.
+            % Re-seed scene-flow only for the LK operation. Mean-Shift is
+            % initialized from a user-drawn ROI, not on the first frame.
+            if strcmp(op, 'Scene Motion (LK)')
+                try
+                    ensureSceneFlowOnPath();
+                    d.tracking.sceneState  = sceneFlow('init', ...
+                        d.tracking.currentFrameInput, getTrackingParams(fig));
+                    d.tracking.initialized = true;
+                catch
+                    % If the user's preprocessing produced a degenerate
+                    % frame, leave the previous state in place rather than
+                    % popping an alert from a passive UI callback.
+                end
             end
             fig.UserData = d;
             renderTrackingPreview(fig);
@@ -1824,6 +2055,18 @@ function img = preProcess(img, h)
             img = im2uint8(min(max(d,0),1));
         else
             img = im2uint8(min(max(applySobel(im2double(img)),0),1));
+        end
+    end
+    % Gaussian pyramid REDUCE: apply impyramid('reduce') N times. Each
+    % level Gaussian-blurs the image and downsamples by 2, exactly as
+    % the course slides describe. After N levels the image is 1 / 2^N
+    % in each dimension. Downstream ops (LK, clustering, rendering) all
+    % see this smaller image - useful for speed on large videos and for
+    % demonstrating coarse-to-fine scale processing.
+    if isfield(h,'chkPyrReduce') && h.chkPyrReduce.Value
+        n = max(1, min(4, round(h.slPyrReduce.Value)));
+        for k = 1:n
+            img = impyramid(img, 'reduce');
         end
     end
 end
